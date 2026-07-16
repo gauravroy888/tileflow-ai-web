@@ -1,9 +1,17 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-@layer base {
-  body {
-    @apply bg-background text-textPrimary antialiased;
-  }
+@theme {
+  --color-primary: #2563EB;
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-error: #DC2626;
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-textPrimary: #111827;
+  --color-textSecondary: #6B7280;
+  --color-border: #E5E7EB;
+}
+
+body {
+  @apply bg-background text-textPrimary antialiased;
 }
