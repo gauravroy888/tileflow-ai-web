@@ -71,9 +71,9 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
-        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/onboarding" element={<Onboarding onComplete={() => setOnboardingCompleted(true)} />} />
         
         {/* Protected Routes */}
         <Route path="/" element={

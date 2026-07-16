@@ -5,7 +5,11 @@ import { Button } from '../components/ui/Button';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '../types';
 
-const Onboarding = () => {
+interface OnboardingProps {
+  onComplete?: () => void;
+}
+
+const Onboarding = ({ onComplete }: OnboardingProps) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [shopName, setShopName] = useState('');
@@ -34,6 +38,7 @@ const Onboarding = () => {
         .single();
       
       if (shop?.onboarding_completed) {
+        if (onComplete) onComplete();
         navigate('/');
       }
     }
@@ -65,6 +70,7 @@ const Onboarding = () => {
           .eq('id', profile.shop_id);
       }
       
+      if (onComplete) onComplete();
       navigate('/');
     } catch (error) {
       console.error(error);
