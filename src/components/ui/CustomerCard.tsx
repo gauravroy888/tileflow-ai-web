@@ -1,5 +1,5 @@
-import { Phone, MessageCircle, MapPin, Building2, Calendar, IndianRupee } from 'lucide-react';
-import { Customer } from '../../types';
+import { Phone, MessageCircle, MapPin, IndianRupee } from 'lucide-react';
+import type { Customer } from '../../types';
 import { Button } from './Button';
 
 interface CustomerCardProps {

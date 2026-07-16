@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Search, Filter, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Customer } from '../types';
+import type { Customer } from '../types';
 import { CustomerCard } from '../components/ui/CustomerCard';
 import { Button } from '../components/ui/Button';
 
