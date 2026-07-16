@@ -1,0 +1,56 @@
+{
+  "app_name": "RetailFlow AI",
+  "login": {
+    "title": "Sign in to your account",
+    "email": "Email address",
+    "password": "Password",
+    "sign_in": "Sign in",
+    "signing_in": "Signing in...",
+    "sign_in_google": "Sign in with Google",
+    "create_account": "Create new account"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "customers": "Customers",
+    "products": "Products",
+    "ai": "AI Chat",
+    "more": "More"
+  },
+  "onboarding": {
+    "title": "Welcome to RetailFlow AI",
+    "subtitle": "Let's set up your business profile",
+    "shop_name": "Business Name",
+    "shop_type": "Retail Type",
+    "shop_type_placeholder": "e.g. Clothing, Electronics, Groceries",
+    "save": "Complete Setup",
+    "saving": "Saving..."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "sign_out": "Sign out",
+    "today_visits": "Today's Visits",
+    "pending_followups": "Pending Follow-ups",
+    "recent_quotations": "Recent Quotations",
+    "ai_quick_actions": "AI Quick Actions",
+    "inventory_scanner": "Inventory Scanner",
+    "sales_analytics": "Sales Analytics",
+    "find_similar": "Find Similar Products"
+  },
+  "products": {
+    "title": "Products",
+    "add_new": "Add New",
+    "search": "Search by name, SKU...",
+    "no_products": "No products found.",
+    "price_sqft": "Price",
+    "in_stock": "In Stock",
+    "out_of_stock": "Out of Stock"
+  },
+  "customers": {
+    "title": "Customers",
+    "add_new": "Add New",
+    "search": "Search by name, phone...",
+    "no_customers": "No customers found.",
+    "call": "Call",
+    "whatsapp": "WhatsApp"
+  }
+}

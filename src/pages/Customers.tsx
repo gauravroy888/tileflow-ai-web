@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase';
 import type { Customer } from '../types';
 import { CustomerCard } from '../components/ui/CustomerCard';
 import { Button } from '../components/ui/Button';
+import { useTranslation } from 'react-i18next';
 
 const Customers = () => {
+  const { t } = useTranslation();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,9 +42,9 @@ const Customers = () => {
     <div className="p-4 space-y-4">
       {/* Header & Actions */}
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-bold text-textPrimary">Customers</h2>
+        <h2 className="text-2xl font-bold text-textPrimary">{t('customers.title')}</h2>
         <Button size="sm" className="gap-1">
-          <UserPlus size={16} /> Add New
+          <UserPlus size={16} /> {t('customers.add_new')}
         </Button>
       </div>
 
@@ -52,7 +54,7 @@ const Customers = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Search by name, phone..."
+            placeholder={t('customers.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary min-h-[48px]"
@@ -72,7 +74,7 @@ const Customers = () => {
         </div>
       ) : filteredCustomers.length === 0 ? (
         <div className="text-center py-10">
-          <p className="text-textSecondary">No customers found.</p>
+          <p className="text-textSecondary">{t('customers.no_customers')}</p>
         </div>
       ) : (
         <div className="space-y-3 mt-4">

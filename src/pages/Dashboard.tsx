@@ -1,70 +1,63 @@
-
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
+import { useTranslation } from 'react-i18next';
 
 const Dashboard = () => {
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+  const { t } = useTranslation();
 
   return (
     <div className="p-4 space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-textPrimary">Dashboard</h2>
-        <Button variant="outline" size="sm" onClick={handleLogout}>
-          Sign out
+        <h2 className="text-2xl font-bold text-textPrimary">{t('dashboard.title')}</h2>
+        <Button variant="outline" size="sm" onClick={() => supabase.auth.signOut()}>
+          {t('dashboard.sign_out')}
         </Button>
       </div>
 
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4">
-        {/* Quick Stats Cards */}
         <div className="bg-surface p-4 rounded-xl shadow-sm border border-border">
-          <p className="text-sm text-textSecondary">Today's Visits</p>
-          <p className="text-2xl font-bold text-textPrimary mt-1">12</p>
+          <p className="text-sm text-textSecondary font-medium">{t('dashboard.today_visits')}</p>
+          <p className="text-3xl font-bold text-textPrimary mt-1">12</p>
         </div>
         <div className="bg-surface p-4 rounded-xl shadow-sm border border-border">
-          <p className="text-sm text-textSecondary">Pending Follow-ups</p>
-          <p className="text-2xl font-bold text-warning mt-1">5</p>
+          <p className="text-sm text-textSecondary font-medium">{t('dashboard.pending_followups')}</p>
+          <p className="text-3xl font-bold text-orange-500 mt-1">5</p>
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Quotations */}
       <div>
-        <h3 className="text-lg font-semibold text-textPrimary mb-3">
-          Recent Quotations
-        </h3>
+        <h3 className="text-lg font-bold text-textPrimary mb-3">{t('dashboard.recent_quotations')}</h3>
         <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
-          <div className="p-4 border-b border-border flex justify-between items-center">
-            <div>
-              <p className="font-medium text-textPrimary">Rahul Sharma</p>
-              <p className="text-sm text-textSecondary">2 BHK Flooring</p>
+          {[
+            { id: 1, name: 'Rahul Sharma', desc: 'Flooring', amt: '1,45,000' },
+            { id: 2, name: 'Priya Designer', desc: 'Bathroom', amt: '85,000' }
+          ].map((q, i) => (
+            <div key={q.id} className={`p-4 flex justify-between items-center ${i !== 0 ? 'border-t border-border' : ''}`}>
+              <div>
+                <p className="font-bold text-textPrimary">{q.name}</p>
+                <p className="text-xs text-textSecondary">{q.desc}</p>
+              </div>
+              <p className="font-bold text-green-600">₹ {q.amt}</p>
             </div>
-            <p className="font-bold text-success">₹ 1,45,000</p>
-          </div>
-          <div className="p-4 flex justify-between items-center">
-            <div>
-              <p className="font-medium text-textPrimary">Priya Designer</p>
-              <p className="text-sm text-textSecondary">Bathroom Tiles</p>
-            </div>
-            <p className="font-bold text-success">₹ 85,000</p>
-          </div>
+          ))}
         </div>
       </div>
-      
+
       {/* AI Quick Actions */}
       <div>
-        <h3 className="text-lg font-semibold text-textPrimary mb-3">
-          AI Quick Actions
-        </h3>
+        <h3 className="text-lg font-bold text-textPrimary mb-3">{t('dashboard.ai_quick_actions')}</h3>
         <div className="grid grid-cols-2 gap-4">
-          <Button variant="secondary" className="w-full flex-col h-auto py-4">
-            <span className="text-xl mb-1">📸</span>
-            <span className="text-sm">Room Visualizer</span>
-          </Button>
-          <Button variant="secondary" className="w-full flex-col h-auto py-4">
-            <span className="text-xl mb-1">🔍</span>
-            <span className="text-sm">Find Similar</span>
-          </Button>
+          <button className="bg-surface p-4 rounded-xl shadow-sm border border-border flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+            <span className="text-2xl">📦</span>
+            <span className="text-sm font-medium text-textPrimary">{t('dashboard.inventory_scanner')}</span>
+          </button>
+          <button className="bg-surface p-4 rounded-xl shadow-sm border border-border flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+            <span className="text-2xl">🔍</span>
+            <span className="text-sm font-medium text-textPrimary">{t('dashboard.find_similar')}</span>
+          </button>
         </div>
       </div>
     </div>

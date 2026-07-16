@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
 import { ProductCard } from '../components/ui/ProductCard';
 import { Button } from '../components/ui/Button';
+import { useTranslation } from 'react-i18next';
 
 const Products = () => {
+  const { t } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,9 +42,9 @@ const Products = () => {
     <div className="p-4 space-y-4">
       {/* Header & Actions */}
       <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-bold text-textPrimary">Products</h2>
+        <h2 className="text-2xl font-bold text-textPrimary">{t('products.title')}</h2>
         <Button size="sm" className="gap-1">
-          <Plus size={16} /> Add New
+          <Plus size={16} /> {t('products.add_new')}
         </Button>
       </div>
 
@@ -52,7 +54,7 @@ const Products = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
-            placeholder="Search by name, SKU..."
+            placeholder={t('products.search')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary min-h-[48px]"
@@ -72,7 +74,7 @@ const Products = () => {
         </div>
       ) : filteredProducts.length === 0 ? (
         <div className="text-center py-10">
-          <p className="text-textSecondary">No products found.</p>
+          <p className="text-textSecondary">{t('products.no_products')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 mt-4">

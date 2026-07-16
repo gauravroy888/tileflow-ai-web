@@ -1,5 +1,6 @@
 import { Heart } from 'lucide-react';
 import type { Product } from '../../types';
+import { useTranslation } from 'react-i18next';
 
 interface ProductCardProps {
   product: Product;
@@ -7,6 +8,15 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, onFavorite }: ProductCardProps) {
+  const { t } = useTranslation();
+
+  const getAttributeString = () => {
+    if (!product.attributes) return product.sku || '';
+    const vals = Object.values(product.attributes).filter(Boolean);
+    if (product.sku) vals.push(product.sku);
+    return vals.join(' • ');
+  };
+
   return (
     <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden flex flex-col">
       <div className="relative aspect-square bg-gray-100">
@@ -40,13 +50,13 @@ export function ProductCard({ product, onFavorite }: ProductCardProps) {
           {product.name}
         </h4>
         
-        <p className="text-xs text-textSecondary mb-2 flex-1">
-          {[product.size, product.finish, product.sku].filter(Boolean).join(' • ')}
+        <p className="text-xs text-textSecondary mb-2 flex-1 line-clamp-2">
+          {getAttributeString()}
         </p>
 
         <div className="flex justify-between items-end mt-auto pt-2 border-t border-border">
           <div>
-            <div className="text-xs text-textSecondary">Price/sqft</div>
+            <div className="text-xs text-textSecondary">{t('products.price_sqft')}</div>
             <div className="font-bold text-primary text-lg leading-none">
               ₹{product.price}
             </div>
@@ -54,7 +64,7 @@ export function ProductCard({ product, onFavorite }: ProductCardProps) {
           <div className={`text-[10px] px-2 py-1 rounded-full font-medium ${
             product.stock_status === 'in_stock' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
           }`}>
-            {product.stock_status === 'in_stock' ? 'In Stock' : 'Out of Stock'}
+            {product.stock_status === 'in_stock' ? t('products.in_stock') : t('products.out_of_stock')}
           </div>
         </div>
       </div>

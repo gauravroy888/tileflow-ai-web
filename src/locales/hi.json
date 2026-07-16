@@ -1,0 +1,56 @@
+{
+  "app_name": "RetailFlow AI",
+  "login": {
+    "title": "अपने खाते में साइन इन करें",
+    "email": "ईमेल पता",
+    "password": "पासवर्ड",
+    "sign_in": "साइन इन करें",
+    "signing_in": "साइन इन हो रहा है...",
+    "sign_in_google": "Google के साथ साइन इन करें",
+    "create_account": "नया खाता बनाएँ"
+  },
+  "nav": {
+    "dashboard": "डैशबोर्ड",
+    "customers": "ग्राहक",
+    "products": "उत्पाद",
+    "ai": "AI चैट",
+    "more": "अधिक"
+  },
+  "onboarding": {
+    "title": "RetailFlow AI में आपका स्वागत है",
+    "subtitle": "आइए अपना व्यवसाय प्रोफ़ाइल सेट करें",
+    "shop_name": "व्यवसाय का नाम",
+    "shop_type": "खुदरा प्रकार (Retail Type)",
+    "shop_type_placeholder": "जैसे कपड़े, इलेक्ट्रॉनिक्स, किराने का सामान",
+    "save": "सेटअप पूरा करें",
+    "saving": "सहेजा जा रहा है..."
+  },
+  "dashboard": {
+    "title": "डैशबोर्ड",
+    "sign_out": "साइन आउट करें",
+    "today_visits": "आज की विजिट",
+    "pending_followups": "लंबित फॉलो-अप",
+    "recent_quotations": "हाल के कोटेशन",
+    "ai_quick_actions": "AI त्वरित कार्रवाई",
+    "inventory_scanner": "इन्वेंटरी स्कैनर",
+    "sales_analytics": "बिक्री एनालिटिक्स",
+    "find_similar": "समान उत्पाद खोजें"
+  },
+  "products": {
+    "title": "उत्पाद",
+    "add_new": "नया जोड़ें",
+    "search": "नाम, SKU से खोजें...",
+    "no_products": "कोई उत्पाद नहीं मिला।",
+    "price_sqft": "कीमत",
+    "in_stock": "स्टॉक में",
+    "out_of_stock": "स्टॉक खत्म"
+  },
+  "customers": {
+    "title": "ग्राहक",
+    "add_new": "नया जोड़ें",
+    "search": "नाम, फोन से खोजें...",
+    "no_customers": "कोई ग्राहक नहीं मिला।",
+    "call": "कॉल करें",
+    "whatsapp": "व्हाट्सएप"
+  }
+}

@@ -1,6 +1,8 @@
 export interface Shop {
   id: string;
   name: string;
+  shop_type?: string;
+  onboarding_completed?: boolean;
   created_at: string;
 }
 
@@ -29,6 +31,7 @@ export interface Product {
   stock_status: string;
   tags: string[] | null;
   image_url: string | null;
+  attributes: Record<string, any>;
   created_at: string;
 }
 
