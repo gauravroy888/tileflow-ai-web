@@ -6,6 +6,8 @@ import type { Session } from '@supabase/supabase-js';
 import MobileLayout from './components/layout/MobileLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Products from './pages/Products';
+import Customers from './pages/Customers';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -43,8 +45,8 @@ function App() {
       <Routes>
         <Route path="/" element={<MobileLayout />}>
           <Route index element={<Dashboard />} />
-          <Route path="customers" element={<div className="p-4">Customers Placeholder</div>} />
-          <Route path="products" element={<div className="p-4">Products Placeholder</div>} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="products" element={<Products />} />
           <Route path="ai" element={<div className="p-4">AI Placeholder</div>} />
           <Route path="more" element={<div className="p-4">More Options Placeholder</div>} />
         </Route>
