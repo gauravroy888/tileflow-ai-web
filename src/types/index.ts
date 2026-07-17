@@ -43,7 +43,7 @@ export interface Customer {
   budget: number | null;
   project_type: string | null;
   location: string | null;
-  visit_status: 'new' | 'follow_up' | 'closed';
+  visit_status: string;
   assigned_to: string | null;
   notes: string | null;
   required_products: string | null;
