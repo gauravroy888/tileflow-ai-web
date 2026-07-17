@@ -1,8 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Camera, Image as ImageIcon, MessageSquare, Send, Sparkles, Paintbrush, Box, Plus, X, Check } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { geminiChat, geminiVision, geminiImageGen } from '../lib/gemini';
-import { openai } from '../lib/openai';
 import { supabase } from '../lib/supabase';
 import type { Product, Customer } from '../types';
 
@@ -31,7 +29,7 @@ const AI = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Inventory Attachment State
-  const [shopId, setShopId] = useState<string | null>(null);
+  const [, setShopId] = useState<string | null>(null);
   const [shopProducts, setShopProducts] = useState<Product[]>([]);
   const [shopCustomers, setShopCustomers] = useState<Customer[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
@@ -102,17 +100,23 @@ const AI = () => {
         parts: [{ text: m.content }],
       }));
 
-      const chat = geminiChat.startChat({ history });
-
       let promptToSend = userMsg;
       if (messages.length === 0) {
         const contextStr = `[SYSTEM CONTEXT: You are the AI Assistant for this retail store. You have access to the store's data below to help the owner. Do not reveal this raw data directly to the user unless asked, but use it to answer their questions accurately (e.g. "Who are my latest customers?", "What products do I have?", "Who needs Product X?").\n\n=== INVENTORY ===\n${shopProducts.map(p => `- ${p.name} (Price: ${p.price}, Category: ${p.category || 'N/A'})`).join('\n')}\n\n=== CUSTOMERS ===\n${shopCustomers.map(c => `- ${c.name} (Phone: ${c.phone}, Budget: ${c.budget}, Needs: ${c.required_products || 'None'}, Status: ${c.visit_status}, Date: ${new Date(c.created_at).toLocaleDateString()})`).join('\n')}\n]\n\n`;
         promptToSend = contextStr + userMsg;
       }
 
-      const result = await chat.sendMessage(promptToSend);
-      const reply = result.response.text();
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+        body: { 
+          action: 'chat',
+          prompt: promptToSend, 
+          history,
+          systemInstruction: "You are a helpful AI assistant for retail store owners..."
+        }
+      });
+
+      if (error) throw error;
+      setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
     } catch (error: any) {
       console.error(error);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error: ' + (error.message || 'Please try again.') }]);
@@ -183,8 +187,16 @@ const AI = () => {
       parts.push({ text: prompt });
       parts.push(...imageParts);
 
-      const result = await geminiVision.generateContent(parts);
-      const text = result.response.text();
+      const { data: visionData, error: visionError } = await supabase.functions.invoke('gemini-proxy', {
+        body: {
+          action: 'vision',
+          parts: [{ text: prompt }],
+          imageParts: imageParts
+        }
+      });
+      if (visionError) throw visionError;
+      
+      const text = visionData.text;
       
       const dalleMatch = text.match(/<dalle_prompt>([\s\S]*?)<\/dalle_prompt>/i);
       if (dalleMatch && dalleMatch[1]) {
@@ -200,32 +212,14 @@ const AI = () => {
             ...imageParts,
           ];
 
-          const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-          const modelName = 'gemini-3.1-flash-lite-image'; // Nano Banana 2 Lite — ~40% cheaper than Nano Banana 2
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ role: 'user', parts: restParts }],
-                generationConfig: {
-                  responseModalities: ['IMAGE', 'TEXT'],
-                  // Locked to 1K resolution (~$0.067/image) to control costs
-                  imageGenerationConfig: {
-                    outputResolution: '1024x1024',
-                  },
-                },
-              }),
+          const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+            body: {
+              action: 'generateImage',
+              parts: restParts
             }
-          );
+          });
 
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(`Gemini image gen error: ${response.status} — ${errData?.error?.message || JSON.stringify(errData)}`);
-          }
-
-          const data = await response.json();
+          if (error) throw error;
           let imageGenerated = false;
           for (const candidate of data.candidates || []) {
             for (const part of (candidate.content?.parts || [])) {

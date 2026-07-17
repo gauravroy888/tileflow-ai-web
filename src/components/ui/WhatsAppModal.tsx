@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { X, MessageCircle, FileText, BookOpen, Bell, Send, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from './Button';
 import type { Customer } from '../../types';
-import { genAI } from '../../lib/gemini';
+import { supabase } from '../../lib/supabase';
 
 interface WhatsAppModalProps {
   customer: Customer;
@@ -82,6 +82,8 @@ function buildMessage(type: TemplateKey, customer: Customer, shopName: string, c
         `We're here to help! Feel free to reply anytime. 😊\n\n` +
         `*${shopName}* Team`
       );
+    case 'ai':
+      return '';
   }
 }
 
@@ -98,7 +100,6 @@ export function WhatsAppModal({ customer, shopName = 'Our Store', catalogueUrl =
       setMessage('');
       setIsGenerating(true);
       try {
-        const model = genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
         const prompt = `Write a short, professional, and friendly WhatsApp follow-up message to a retail customer from the shop "${shopName}".
 Customer Name: ${customer.name}
 Project Type: ${customer.project_type || 'General Inquiry'}
@@ -113,8 +114,12 @@ Rules:
 - Be conversational and polite.
 - Do NOT include any placeholders, use the actual variables provided.`;
         
-        const result = await model.generateContent(prompt);
-        setMessage(result.response.text().trim());
+        const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+          body: { prompt }
+        });
+
+        if (error) throw error;
+        setMessage(data.text.trim());
       } catch (error) {
         console.error('Failed to generate AI message:', error);
         setMessage('Oops! Failed to generate the AI message. Please check your API key and try again.');
