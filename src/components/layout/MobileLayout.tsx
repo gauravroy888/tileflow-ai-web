@@ -1,11 +1,33 @@
 
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import { supabase } from '../../lib/supabase';
 import { Home, Users, Grid, Sparkles, Menu, Languages } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useEffect, useState } from 'react';
 
 const MobileLayout = () => {
   const location = useLocation();
   const { t, i18n } = useTranslation();
+  const [shopName, setShopName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchShopName = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('shops(name)')
+        .eq('id', user.id)
+        .single();
+      if (error) {
+        console.error("Error fetching shop name:", error);
+        return;
+      }
+      const shop = data?.shops as any;
+      if (shop?.name) setShopName(shop.name);
+    };
+    fetchShopName();
+  }, []);
 
   const toggleLanguage = () => {
     const newLang = i18n.language === 'en' ? 'hi' : 'en';
@@ -24,14 +46,20 @@ const MobileLayout = () => {
     <div className="flex flex-col h-screen bg-background">
       {/* Top Bar */}
       <header className="bg-surface px-4 py-3 flex justify-between items-center shadow-sm sticky top-0 z-10 border-b border-border">
-        <h1 className="text-xl font-bold text-primary">{t('app_name')}</h1>
+        <h1 className="text-xl font-bold text-primary">{shopName || t('app_name')}</h1>
         <div className="flex items-center gap-4">
           <button onClick={toggleLanguage} className="text-textSecondary hover:text-primary flex items-center gap-1 text-sm font-medium">
             <Languages size={18} />
             {i18n.language === 'en' ? 'HI' : 'EN'}
           </button>
-          {/* Placeholder for Profile/Notifications */}
-          <div className="w-8 h-8 rounded-full bg-gray-200"></div>
+          {/* Logout Button */}
+          <button 
+            onClick={() => supabase.auth.signOut()} 
+            className="text-textSecondary hover:text-red-500 flex items-center gap-1 text-sm font-medium"
+            title="Sign Out"
+          >
+            Sign Out
+          </button>
         </div>
       </header>
 

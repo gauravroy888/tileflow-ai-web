@@ -46,5 +46,6 @@ export interface Customer {
   visit_status: string;
   assigned_to: string | null;
   notes: string | null;
+  required_products: string | null;
   created_at: string;
 }

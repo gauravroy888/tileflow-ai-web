@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 const Dashboard = () => {
   const { t } = useTranslation();
@@ -50,14 +51,14 @@ const Dashboard = () => {
       <div>
         <h3 className="text-lg font-bold text-textPrimary mb-3">{t('dashboard.ai_quick_actions')}</h3>
         <div className="grid grid-cols-2 gap-4">
-          <button className="bg-surface p-4 rounded-xl shadow-sm border border-border flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+          <Link to="/ai" className="bg-surface p-4 rounded-xl shadow-sm border border-border flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
             <span className="text-2xl">📦</span>
             <span className="text-sm font-medium text-textPrimary">{t('dashboard.inventory_scanner')}</span>
-          </button>
-          <button className="bg-surface p-4 rounded-xl shadow-sm border border-border flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
+          </Link>
+          <Link to="/ai" className="bg-surface p-4 rounded-xl shadow-sm border border-border flex flex-col items-center justify-center gap-2 hover:bg-gray-50 transition-colors">
             <span className="text-2xl">🔍</span>
             <span className="text-sm font-medium text-textPrimary">{t('dashboard.find_similar')}</span>
-          </button>
+          </Link>
         </div>
       </div>
     </div>

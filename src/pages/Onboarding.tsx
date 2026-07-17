@@ -53,14 +53,14 @@ const Onboarding = ({ onComplete }: OnboardingProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('No user');
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('shop_id')
         .eq('id', user.id)
         .single<Profile>();
 
       if (profile?.shop_id) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('shops')
           .update({
             name: shopName,
@@ -68,12 +68,23 @@ const Onboarding = ({ onComplete }: OnboardingProps) => {
             onboarding_completed: true
           })
           .eq('id', profile.shop_id);
+          
+        if (updateError) {
+          alert("Error saving shop details: " + updateError.message);
+          setLoading(false);
+          return;
+        }
+      } else {
+        alert("Database Error: " + (profileError?.message || "Profile not found"));
+        setLoading(false);
+        return;
       }
       
       if (onComplete) onComplete();
       navigate('/');
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      alert("Submission Error: " + (error.message || JSON.stringify(error)));
     } finally {
       setLoading(false);
     }
@@ -123,6 +134,15 @@ const Onboarding = ({ onComplete }: OnboardingProps) => {
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? t('onboarding.saving') : t('onboarding.save')}
+          </Button>
+
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full mt-4" 
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign Out & Try Different Account
           </Button>
         </form>
       </div>

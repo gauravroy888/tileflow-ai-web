@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Onboarding from './pages/Onboarding';
+import AI from './pages/AI';
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -82,7 +83,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="customers" element={<Customers />} />
           <Route path="products" element={<Products />} />
-          <Route path="ai" element={<div className="p-4">AI Placeholder</div>} />
+          <Route path="ai" element={<AI />} />
           <Route path="more" element={<div className="p-4">More Options Placeholder</div>} />
         </Route>
         

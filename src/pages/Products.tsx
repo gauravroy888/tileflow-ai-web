@@ -5,12 +5,16 @@ import type { Product } from '../types';
 import { ProductCard } from '../components/ui/ProductCard';
 import { Button } from '../components/ui/Button';
 import { useTranslation } from 'react-i18next';
+import { AddProductModal } from '../components/products/AddProductModal';
 
 const Products = () => {
   const { t } = useTranslation();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [shopId, setShopId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -19,17 +23,37 @@ const Products = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Not authenticated');
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('shop_id')
+        .eq('id', session.user.id)
+        .single();
+        
+      if (profile) setShopId(profile.shop_id);
+
       const { data, error } = await supabase
         .from('products')
         .select('*')
-        .order('created_at', { ascending: false });
-
       if (error) throw error;
       setProducts(data || []);
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) throw error;
+      setProducts(products.filter(p => p.id !== id));
+    } catch (error: any) {
+      console.error('Error deleting product:', error);
+      alert('Failed to delete product: ' + error.message);
     }
   };
 
@@ -43,7 +67,7 @@ const Products = () => {
       {/* Header & Actions */}
       <div className="flex justify-between items-center mb-2">
         <h2 className="text-2xl font-bold text-textPrimary">{t('products.title')}</h2>
-        <Button size="sm" className="gap-1">
+        <Button size="sm" className="gap-1" onClick={() => setIsAddModalOpen(true)}>
           <Plus size={16} /> {t('products.add_new')}
         </Button>
       </div>
@@ -79,10 +103,23 @@ const Products = () => {
       ) : (
         <div className="grid grid-cols-2 gap-3 mt-4">
           {filteredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard 
+              key={product.id} 
+              product={product} 
+              onEdit={() => setProductToEdit(product)} 
+              onDelete={handleDeleteProduct} 
+            />
           ))}
         </div>
       )}
+
+      <AddProductModal 
+        isOpen={isAddModalOpen || !!productToEdit} 
+        onClose={() => { setIsAddModalOpen(false); setProductToEdit(null); }} 
+        onProductAdded={() => { fetchProducts(); setProductToEdit(null); }} 
+        shopId={shopId} 
+        productToEdit={productToEdit}
+      />
     </div>
   );
 };

@@ -1,13 +1,15 @@
-import { Heart } from 'lucide-react';
+import { Heart, Edit2, Trash2 } from 'lucide-react';
 import type { Product } from '../../types';
 import { useTranslation } from 'react-i18next';
 
 interface ProductCardProps {
   product: Product;
   onFavorite?: (id: string) => void;
+  onEdit?: (product: Product) => void;
+  onDelete?: (id: string) => void;
 }
 
-export function ProductCard({ product, onFavorite }: ProductCardProps) {
+export function ProductCard({ product, onFavorite, onEdit, onDelete }: ProductCardProps) {
   const { t } = useTranslation();
 
   const getAttributeString = () => {
@@ -39,6 +41,28 @@ export function ProductCard({ product, onFavorite }: ProductCardProps) {
         >
           <Heart size={20} className="text-gray-500 hover:text-red-500" />
         </button>
+        {onEdit && (
+          <button
+            onClick={() => onEdit(product)}
+            className="absolute top-2 left-2 p-2 bg-white/80 rounded-full shadow-sm hover:bg-white min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Edit"
+          >
+            <Edit2 size={20} className="text-gray-500 hover:text-primary" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => {
+              if (window.confirm('Are you sure you want to delete this product?')) {
+                onDelete(product.id);
+              }
+            }}
+            className="absolute top-2 left-14 p-2 bg-white/80 rounded-full shadow-sm hover:bg-white min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Delete"
+          >
+            <Trash2 size={20} className="text-gray-500 hover:text-red-500" />
+          </button>
+        )}
       </div>
 
       <div className="p-3 flex flex-col flex-1">
@@ -62,9 +86,12 @@ export function ProductCard({ product, onFavorite }: ProductCardProps) {
             </div>
           </div>
           <div className={`text-[10px] px-2 py-1 rounded-full font-medium ${
-            product.stock_status === 'in_stock' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            product.stock_status === 'in_stock' ? 'bg-green-100 text-green-700' : 
+            product.stock_status === 'low_stock' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
           }`}>
-            {product.stock_status === 'in_stock' ? t('products.in_stock') : t('products.out_of_stock')}
+            {product.stock_status === 'in_stock' ? t('products.in_stock') : 
+             product.stock_status === 'low_stock' ? 'Low Stock' : 
+             product.stock_status === 'discontinued' ? 'Discontinued' : t('products.out_of_stock')}
           </div>
         </div>
       </div>
