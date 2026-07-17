@@ -43,9 +43,13 @@ export interface Customer {
   budget: number | null;
   project_type: string | null;
   location: string | null;
-  visit_status: string;
+  visit_status: 'new' | 'follow_up' | 'closed';
   assigned_to: string | null;
   notes: string | null;
   required_products: string | null;
+  ai_draft_message?: string | null;
   created_at: string;
+  assigned_profile?: {
+    full_name: string | null;
+  } | null;
 }

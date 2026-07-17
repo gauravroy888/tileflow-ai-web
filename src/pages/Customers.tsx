@@ -33,10 +33,67 @@ const Customers = () => {
     required_products: '',
   });
 
+  const [retailerName, setRetailerName] = useState<string>('');
+  const [shopName, setShopName] = useState<string>('Your Tile Shop');
+
   useEffect(() => {
     fetchCustomers();
     fetchShopProducts();
+    fetchShopDetails();
   }, []);
+
+  const fetchShopDetails = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select(`
+          full_name,
+          shops ( name )
+        `)
+        .eq('id', session.user.id)
+        .single();
+        
+      if (profile) {
+        setRetailerName(profile.full_name || '');
+        // @ts-ignore - Supabase type inference for joins can be strict
+        if (profile.shops && profile.shops.name) {
+          // @ts-ignore
+          setShopName(profile.shops.name);
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching shop details:', e);
+    }
+  };
+
+  const generateCustomerDraft = async (customerData: any, customerId: string, shop: string, retailer: string) => {
+    try {
+      const prompt = `Write a short, professional, and friendly WhatsApp follow-up message to a retail customer from the shop "${shop}". The message is from "${retailer}".
+Customer Name: ${customerData.name}
+Project Type: ${customerData.project_type || 'General Inquiry'}
+Required Products: ${customerData.required_products || 'Not specified'}
+
+Rules:
+- Keep it under 4 sentences.
+- Be conversational and polite.
+- Sign off with the retailer's name and shop name.`;
+        
+      const { data, error } = await supabase.functions.invoke('gemini-proxy', {
+        body: { action: 'chat', prompt, history: [] }
+      });
+
+      if (!error && data?.text) {
+        await supabase.from('customers').update({ ai_draft_message: data.text.trim() }).eq('id', customerId);
+        // Silently refresh customers list in the background to show the new draft if user opens it
+        fetchCustomers();
+      }
+    } catch (err) {
+      console.error('Background AI Draft failed:', err);
+    }
+  };
 
   const fetchShopProducts = async () => {
     try {
@@ -102,20 +159,21 @@ const Customers = () => {
     }
 
     setForm({
-      name: customer.name || '',
+      name: customer.name,
       phone: customer.phone || '',
-      budget: customer.budget ? customer.budget.toString() : '',
+      budget: customer.budget?.toString() || '',
       location: customer.location || '',
       project_type: customer.project_type || '',
-      visit_status: customer.visit_status || 'new',
+      visit_status: customer.visit_status,
       notes: customer.notes || '',
-      required_products: customer.required_products || '',
+      required_products: '',
     });
     setIsModalOpen(true);
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return alert('Customer name is required.');
+    if (!form.name.trim()) return;
+
     setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -147,12 +205,17 @@ const Customers = () => {
           .eq('id', editingCustomerId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('customers').insert({
+        const { data: newCustomer, error } = await supabase.from('customers').insert({
           ...customerData,
           shop_id: profile.shop_id,
           assigned_to: null,
-        });
+        }).select().single();
         if (error) throw error;
+        
+        // Background task
+        if (newCustomer) {
+          generateCustomerDraft(customerData, newCustomer.id, shopName, retailerName);
+        }
       }
 
       setIsModalOpen(false);
@@ -211,7 +274,7 @@ const Customers = () => {
       ) : (
         <div className="space-y-3 mt-4">
           {filteredCustomers.map((customer) => (
-            <CustomerCard key={customer.id} customer={customer} onEdit={() => handleEditCustomer(customer)} shopProducts={shopProducts} />
+            <CustomerCard key={customer.id} customer={customer} onEdit={() => handleEditCustomer(customer)} shopProducts={shopProducts} shopName={shopName} retailerName={retailerName} />
           ))}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, MessageCircle, FileText, BookOpen, Bell, Send, Sparkles, Loader2 } from 'lucide-react';
+import { X, MessageCircle, FileText, BookOpen, Bell, Send, Sparkles, Loader2, Check } from 'lucide-react';
 import { Button } from './Button';
 import type { Customer } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase';
 interface WhatsAppModalProps {
   customer: Customer;
   shopName?: string;
+  retailerName?: string;
   catalogueUrl?: string;
   onClose: () => void;
 }
@@ -46,7 +47,7 @@ const TEMPLATES: Record<TemplateKey, { icon: any; label: string; color: string; 
   },
 };
 
-function buildMessage(type: TemplateKey, customer: Customer, shopName: string, catalogueUrl: string): string {
+function buildMessage(type: TemplateKey, customer: Customer, shopName: string, retailerName: string, catalogueUrl: string): string {
   const name = customer.name.split(' ')[0];
   switch (type) {
     case 'quick':
@@ -74,12 +75,16 @@ function buildMessage(type: TemplateKey, customer: Customer, shopName: string, c
         `*${shopName}* 🙏`
       );
     case 'followup':
+      if (customer.ai_draft_message) {
+        return customer.ai_draft_message;
+      }
       return (
         `Hi ${name}! 👋\n\n` +
         `This is a friendly follow-up from *${shopName}*.\n\n` +
         `We noticed you visited us recently and wanted to check if you had any questions ` +
         `or if you'd like to proceed with your ${customer.project_type || 'project'}.\n\n` +
         `We're here to help! Feel free to reply anytime. 😊\n\n` +
+        `${retailerName ? `*${retailerName}*\n` : ''}` +
         `*${shopName}* Team`
       );
     case 'ai':
@@ -87,7 +92,7 @@ function buildMessage(type: TemplateKey, customer: Customer, shopName: string, c
   }
 }
 
-export function WhatsAppModal({ customer, shopName = 'Our Store', catalogueUrl = window.location.origin, onClose }: WhatsAppModalProps) {
+export function WhatsAppModal({ customer, shopName = 'Our Store', retailerName = '', catalogueUrl = window.location.origin, onClose }: WhatsAppModalProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey | null>(null);
   const [message, setMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -95,7 +100,7 @@ export function WhatsAppModal({ customer, shopName = 'Our Store', catalogueUrl =
   const handleSelectTemplate = async (type: TemplateKey) => {
     setSelectedTemplate(type);
     if (type !== 'ai') {
-      setMessage(buildMessage(type, customer, shopName, catalogueUrl));
+      setMessage(buildMessage(type, customer, shopName, retailerName, catalogueUrl));
     } else {
       setMessage('');
       setIsGenerating(true);
@@ -115,7 +120,7 @@ Rules:
 - Do NOT include any placeholders, use the actual variables provided.`;
         
         const { data, error } = await supabase.functions.invoke('gemini-proxy', {
-          body: { prompt }
+          body: { action: 'chat', prompt, history: [] }
         });
 
         if (error) throw error;
@@ -129,15 +134,46 @@ Rules:
     }
   };
 
-  const handleSend = () => {
+  const [isSending, setIsSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
+
+  const handleSend = async () => {
     if (!message.trim()) return;
+    
     // Clean phone: strip non-numeric except leading +
     const rawPhone = customer.phone || '';
     const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
     const phone = cleanPhone.startsWith('91') ? cleanPhone : `91${cleanPhone}`;
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-    onClose();
+
+    // Split routing: Only 'followup' goes through the background API
+    if (selectedTemplate === 'followup') {
+      setIsSending(true);
+      setSendSuccess(false);
+
+      try {
+        const { data, error } = await supabase.functions.invoke('whatsapp-sender', {
+          body: { phone, message }
+        });
+
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+
+        setSendSuccess(true);
+        setTimeout(() => {
+          onClose();
+        }, 2000);
+      } catch (error) {
+        console.error('Failed to send WhatsApp message:', error);
+        alert('Failed to send message automatically. Please make sure the customer has messaged you within 24 hours, or check the console for details.');
+      } finally {
+        setIsSending(false);
+      }
+    } else {
+      // All other methods open the retailer's personal WhatsApp app
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+      onClose();
+    }
   };
 
   return (
@@ -232,13 +268,23 @@ Rules:
         {/* Footer */}
         <div className="p-4 border-t border-border flex gap-3 shrink-0">
           <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button
-            className="flex-1 gap-2 bg-green-500 hover:bg-green-600 text-white border-green-500"
-            onClick={handleSend}
-            disabled={!message.trim() || !customer.phone}
-          >
-            <Send size={16} />
-            Open WhatsApp
+          <Button onClick={handleSend} disabled={!message.trim() || isSending || sendSuccess || !customer.phone} className="flex-1 bg-green-500 hover:bg-green-600">
+            {isSending ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2" />
+                Sending...
+              </>
+            ) : sendSuccess ? (
+              <>
+                <Check size={18} className="mr-2" />
+                Sent!
+              </>
+            ) : (
+              <>
+                <Send size={18} className="mr-2" />
+                Send via WhatsApp
+              </>
+            )}
           </Button>
         </div>
         {!customer.phone && (

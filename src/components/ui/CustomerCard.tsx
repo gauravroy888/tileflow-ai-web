@@ -9,9 +9,11 @@ interface CustomerCardProps {
   customer: Customer;
   onEdit?: () => void;
   shopProducts?: Product[];
+  shopName?: string;
+  retailerName?: string;
 }
 
-export function CustomerCard({ customer, onEdit, shopProducts = [] }: CustomerCardProps) {
+export function CustomerCard({ customer, onEdit, shopProducts = [], shopName = 'Your Tile Shop', retailerName = '' }: CustomerCardProps) {
   const [isWhatsAppOpen, setIsWhatsAppOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
@@ -132,7 +134,8 @@ export function CustomerCard({ customer, onEdit, shopProducts = [] }: CustomerCa
       {isWhatsAppOpen && (
         <WhatsAppModal
           customer={customer}
-          shopName="Your Tile Shop" // In a real app this would come from shop context
+          shopName={shopName}
+          retailerName={retailerName}
           onClose={() => setIsWhatsAppOpen(false)}
         />
       )}
