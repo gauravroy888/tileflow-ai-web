@@ -5,7 +5,7 @@ import { Button } from '../components/ui/Button';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import { retailProfiles } from '../config/retailProfiles';
 import type { ModuleId } from '../config/retailProfiles';
-import { Check, ArrowLeft, Info } from 'lucide-react';
+import { Check, ArrowLeft } from 'lucide-react';
 
 
 
@@ -37,9 +37,8 @@ const Settings = () => {
     setRetailProfileId(id);
     const profile = retailProfiles[id];
     if (profile) {
-      // Merge recommended with currently enabled to avoid losing user's custom toggles
-      const newModules = new Set([...enabledModules, ...profile.recommendedModules]);
-      setEnabledModules(Array.from(newModules));
+      // Replace entirely with the selected profile's recommended modules
+      setEnabledModules([...profile.recommendedModules]);
     }
   };
 
