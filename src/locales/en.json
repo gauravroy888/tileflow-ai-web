@@ -1,5 +1,14 @@
 {
   "app_name": "RetailFlow AI",
+  "common": {
+    "name": "Name",
+    "phone": "Phone",
+    "budget": "Budget (\u20B9)",
+    "location": "Location",
+    "project_type": "Project Type",
+    "status": "Status",
+    "select": "Select..."
+  },
   "login": {
     "title": "Sign in to your account",
     "email": "Email address",
@@ -16,15 +25,6 @@
     "ai": "AI",
     "more": "More"
   },
-  "onboarding": {
-    "title": "Welcome to RetailFlow AI",
-    "subtitle": "Let's set up your business profile",
-    "shop_name": "Business Name",
-    "shop_type": "Retail Type",
-    "shop_type_placeholder": "e.g. Clothing, Electronics, Groceries",
-    "save": "Complete Setup",
-    "saving": "Saving..."
-  },
   "dashboard": {
     "title": "Dashboard",
     "sign_out": "Sign out",
@@ -34,23 +34,70 @@
     "ai_quick_actions": "AI Quick Actions",
     "inventory_scanner": "Inventory Scanner",
     "sales_analytics": "Sales Analytics",
-    "find_similar": "Find Similar Products"
+    "find_similar": "Find Similar Products",
+    "ai_visualise": "Visualise a space",
+    "ai_compare": "Product comparisons",
+    "ai_reminders": "Draft follow-ups",
+    "ai_assistant": "AI Assistant",
+    "ai_visualise_desc": "Use showroom products to create a design concept.",
+    "ai_compare_desc": "Compare specs and warranties instantly.",
+    "ai_reminders_desc": "Generate polite appointment reminders.",
+    "ai_assistant_desc": "Leverage AI for your daily tasks.",
+    "date": "Today",
+    "welcome": "Your showroom, in flow.",
+    "subtitle": "Stay ahead of customer follow-ups and turn product interest into quotes.",
+    "add_lead": "Add lead",
+    "create_quote": "Create quote",
+    "glance": "Today at a glance",
+    "workspace": "Sales workspace",
+    "updated": "Updated now",
+    "follow_ups": "Follow-ups due",
+    "deals": "Keep deals moving",
+    "attention": "Follow-ups needing attention",
+    "view_all": "View all",
+    "follow_up_action": "Follow up"
   },
   "products": {
     "title": "Products",
     "add_new": "Add New",
     "search": "Search by name, SKU...",
     "no_products": "No products found.",
+    "no_products_desc": "Add your first product to start building your digital catalogue.",
     "price_sqft": "Price",
     "in_stock": "In Stock",
-    "out_of_stock": "Out of Stock"
+    "out_of_stock": "Out of Stock",
+    "all_items": "All items",
+    "low_stock": "Low stock",
+    "workspace": "Catalogue workspace",
+    "in_catalogue": "items in catalogue",
+    "low_stock_label": "low stock"
   },
   "customers": {
     "title": "Customers",
     "add_new": "Add New",
     "search": "Search by name, phone...",
     "no_customers": "No customers found.",
+    "no_customers_sub": "Add a new {{item}} to keep their requirements, products and follow-ups together.",
     "call": "Call",
-    "whatsapp": "WhatsApp"
+    "whatsapp": "WhatsApp",
+    "breadcrumb": "Sales pipeline",
+    "subtitle": "Keep every {{item}} moving forward.",
+    "follow_ups": "{{count}} follow-ups need attention",
+    "follow_ups_sub": "Keep the next conversation close to hand.",
+    "add_customer": "Add New Customer",
+    "edit_customer": "Edit Customer",
+    "products_required": "Products Required",
+    "placeholder": {
+      "name": "e.g. Rahul Sharma",
+      "phone": "e.g. +91 98765 43210",
+      "location": "e.g. Mumbai"
+    },
+    "status": {
+      "all": "All",
+      "planning": "Planning",
+      "visiting": "Visiting",
+      "quoted": "Quoted",
+      "purchased": "Purchased"
+    }
   }
 }

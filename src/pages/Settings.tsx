@@ -19,6 +19,7 @@ const Settings = () => {
   const [retailProfileId, setRetailProfileId] = useState<string>(shop?.retail_profile_id || 'showroom');
   const [enabledModules, setEnabledModules] = useState<ModuleId[]>(shop?.enabled_modules || []);
   const [shopName, setShopName] = useState(shop?.name || '');
+  const [themePreference, setThemePreference] = useState<'default' | 'dark' | 'dynamic'>(shop?.branding?.theme || 'dynamic');
 
   useEffect(() => {
     checkRole();
@@ -55,6 +56,7 @@ const Settings = () => {
           name: shopName,
           retail_profile_id: retailProfileId,
           enabled_modules: enabledModules,
+          branding: { ...(shop?.branding || {}), theme: themePreference },
         })
         .eq('id', shop.id);
         
@@ -120,7 +122,26 @@ const Settings = () => {
         </div>
       </section>
 
-
+      <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">
+        <h3 className="text-lg font-bold">Theme Preference</h3>
+        <p className="text-sm text-textSecondary">Choose the overall visual style of your app.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+          {[
+            { id: 'dynamic', label: 'Dynamic (Business Type)' },
+            { id: 'default', label: 'Default (Original)' },
+            { id: 'dark', label: 'Dark Mode' }
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setThemePreference(t.id as any)}
+              className={`flex items-center justify-between p-4 rounded-xl border transition-colors text-left ${themePreference === t.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30'}`}
+            >
+              <span className="font-semibold text-textPrimary">{t.label}</span>
+              {themePreference === t.id && <Check size={18} className="text-primary" />}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <div className="flex justify-end gap-3 pt-4">
         <Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button>

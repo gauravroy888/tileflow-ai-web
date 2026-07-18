@@ -1,33 +1,16 @@
-import { ArrowLeft, Check, EllipsisVertical, Info, Minus, PackagePlus, Plus, Send, Trash2, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ArrowLeft, Check, EllipsisVertical, Info, Minus, PackagePlus, Plus, Search, Send, Trash2, X, Loader2 } from 'lucide-react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import { calculators } from '../lib/calculators';
 import type { CalculatorConfig } from '../lib/calculators';
+import { supabase } from '../lib/supabase';
+import type { Customer, Product } from '../types';
 
-type QuoteItem = {
-  id: string;
-  name: string;
-  size: string;
-  finish: string;
-  price: number;
+type QuoteItem = Product & {
   quantity: number;
-  areaPerPiece: number;
-  thumbnail: string;
 };
-
-const catalogue: Omit<QuoteItem, 'quantity'>[] = [
-  { id: 'statuario-grey', name: 'Statuario Grey', size: '600 × 1200 mm', finish: 'Polished', price: 230, areaPerPiece: 8, thumbnail: 'linear-gradient(135deg, #A7A7A3 0%, #E3E1DB 52%, #7D7D7B 100%)' },
-  { id: 'crema-beige', name: 'Crema Beige', size: '600 × 1200 mm', finish: 'Matt', price: 200, areaPerPiece: 8, thumbnail: 'linear-gradient(135deg, #D6C2A0 0%, #F3E9D5 48%, #BCA786 100%)' },
-  { id: 'noir-stone', name: 'Noir Stone', size: '600 × 600 mm', finish: 'Matt', price: 180, areaPerPiece: 4, thumbnail: 'linear-gradient(135deg, #39414A 0%, #777A76 48%, #1D252B 100%)' },
-];
-
-const customers = [
-  { name: 'Priya Shah', project: '3BHK renovation', location: 'Mumbai', initials: 'PS' },
-  { name: 'Rahul Kumar', project: 'New home flooring', location: 'Thane', initials: 'RK' },
-  { name: 'Amit Mehta', project: 'Commercial project', location: 'Pune', initials: 'AM' },
-];
 
 const formatRupee = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -39,32 +22,118 @@ const QuoteBuilder = () => {
   const navigate = useNavigate();
   const { calculatorKey } = useRetailProfile();
   
-  const [items, setItems] = useState<QuoteItem[]>([
-    { ...catalogue[0], quantity: 40 },
-    { ...catalogue[1], quantity: 30 },
-  ]);
-  const [customer, setCustomer] = useState(customers[0]);
+  const [items, setItems] = useState<QuoteItem[]>([]);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
   const [waste, setWaste] = useState(10);
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
   const [isShareReady, setIsShareReady] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoadingData(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return;
+        const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', session.user.id).single();
+        if (!profile) return;
+        
+        const [productsRes, customersRes] = await Promise.all([
+          supabase.from('products').select('*').eq('shop_id', profile.shop_id),
+          supabase.from('customers').select('*').eq('shop_id', profile.shop_id).order('created_at', { ascending: false })
+        ]);
+        
+        if (productsRes.data) setProducts(productsRes.data);
+        if (customersRes.data) {
+          setCustomers(customersRes.data);
+          if (customersRes.data.length > 0) setCustomer(customersRes.data[0]);
+        }
+      } catch (err) {
+        console.error('Error fetching data', err);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   const summary = useMemo(() => {
     const config: CalculatorConfig = { wastePercentage: waste };
     const calculator = calculators[calculatorKey] || calculators.generic;
-    return calculator(items as any, config);
+    // Map our DB QuoteItem to what the calculators expect
+    const calcItems = items.map(item => ({
+      ...item,
+      areaPerPiece: item.attributes?.areaPerPiece || 1
+    }));
+    return calculator(calcItems as any, config);
   }, [items, waste, calculatorKey]);
 
   const updateQuantity = (id: string, difference: number) => setItems((current) => current.map((item) => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + difference) } : item));
   const removeItem = (id: string) => setItems((current) => current.filter((item) => item.id !== id));
-  const addItem = (tile: Omit<QuoteItem, 'quantity'>) => {
-    setItems((current) => current.some((item) => item.id === tile.id) ? current : [...current, { ...tile, quantity: 10 }]);
+  const addItem = (product: Product) => {
+    setItems((current) => current.some((item) => item.id === product.id) ? current : [...current, { ...product, quantity: 10 }]);
     setIsProductPickerOpen(false);
   };
-  const shareQuote = () => {
-    setIsShareReady(true);
-    window.setTimeout(() => setIsShareReady(false), 2200);
+  
+  const shareQuote = async () => {
+    if (!customer) return alert('Please select a customer');
+    if (items.length === 0) return alert('Please add items to quote');
+
+    try {
+      setIsSaving(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', session?.user?.id).single();
+      if (!profile) throw new Error('No profile');
+
+      // Insert Quote
+      const { data: quote, error: quoteError } = await supabase.from('quotes').insert({
+        shop_id: profile.shop_id,
+        customer_id: customer.id,
+        subtotal: summary.subtotal,
+        tax: summary.tax,
+        total_amount: summary.total,
+        status: 'draft'
+      }).select().single();
+
+      if (quoteError) throw quoteError;
+
+      // Insert Quote Items
+      const quoteItems = items.map(item => ({
+        quote_id: quote.id,
+        product_id: item.id,
+        quantity: item.quantity,
+        price_at_time: item.price
+      }));
+
+      const { error: itemsError } = await supabase.from('quote_items').insert(quoteItems);
+      if (itemsError) throw itemsError;
+
+      setIsShareReady(true);
+      setTimeout(() => {
+        setIsShareReady(false);
+      }, 3000);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save quote');
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  if (loadingData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="animate-spin text-primary" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="page-shell mx-auto max-w-screen-xl pb-32 pt-3 sm:pt-5">
@@ -75,23 +144,32 @@ const QuoteBuilder = () => {
       </header>
 
       <section className="rounded-2xl border border-border bg-surface p-3.5 shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accentSoft text-xs font-extrabold text-[#9A482A]">{customer.initials}</div>
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{customer.name}</p><p className="mt-0.5 truncate text-xs text-textSecondary">{customer.project} · {customer.location}</p></div>
-          <button onClick={() => setIsCustomerPickerOpen(true)} className="rounded-xl border border-border px-3 py-2 text-xs font-extrabold text-primary transition-colors hover:bg-sand">Change</button>
-        </div>
+        {customer ? (
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accentSoft text-xs font-extrabold text-[#9A482A]">{customer.name.substring(0,2).toUpperCase()}</div>
+            <div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{customer.name}</p><p className="mt-0.5 truncate text-xs text-textSecondary">{customer.project_type || 'General'} · {customer.location || 'Unknown'}</p></div>
+            <button onClick={() => setIsCustomerPickerOpen(true)} className="rounded-xl border border-border px-3 py-2 text-xs font-extrabold text-primary transition-colors hover:bg-sand">Change</button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-textSecondary">No customer selected</span>
+            <button onClick={() => setIsCustomerPickerOpen(true)} className="rounded-xl border border-border px-3 py-2 text-xs font-extrabold text-primary transition-colors hover:bg-sand">Select</button>
+          </div>
+        )}
       </section>
 
       <section className="mt-5">
         <div className="mb-3 flex items-center justify-between"><div><p className="eyebrow">Quote lines</p><h2 className="mt-0.5 text-lg font-extrabold">Products</h2></div><button onClick={() => setIsProductPickerOpen(true)} className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-extrabold text-white shadow-sm transition-colors hover:bg-primaryHover"><Plus size={15} /> Add item</button></div>
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
           {items.length === 0 ? <div className="px-5 py-10 text-center"><div className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-sand text-primary"><PackagePlus size={20} /></div><p className="mt-3 text-sm font-extrabold">Add your first quote item</p><button onClick={() => setIsProductPickerOpen(true)} className="mt-3 text-xs font-extrabold text-primary">Browse catalogue</button></div> : items.map((item, index) => {
-            const area = item.quantity * item.areaPerPiece;
+            const areaPerPiece = item.attributes?.areaPerPiece || 1;
+            const area = item.quantity * areaPerPiece;
+            const bgThumbnail = item.image_url ? `url(${item.image_url})` : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)';
             return <div key={item.id} className={`p-3.5 ${index ? 'border-t border-border' : ''}`}>
               <div className="flex gap-3">
-                <div className="h-20 w-20 shrink-0 rounded-xl border border-black/5 shadow-inner" style={{ background: item.thumbnail }} aria-label={`${item.name} tile sample`} />
-                <div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{item.name}</p><p className="mt-1 text-xs text-textSecondary">{item.size}</p><p className="mt-1 text-xs text-textSecondary">{item.finish} · {formatRupee(item.price)}/sq ft</p><p className="mt-2 text-xs font-bold text-primary">{area.toFixed(2)} sq ft</p></div>
-                <div className="flex w-[110px] shrink-0 flex-col rounded-xl border border-border bg-[#FCFBF9] p-2.5"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-textSecondary">Qty (pcs)</span><button onClick={() => removeItem(item.id)} className="text-textSecondary transition-colors hover:text-error" aria-label={`Remove ${item.name}`}><Trash2 size={14} /></button></div><div className="mt-1 flex items-center justify-between"><button onClick={() => updateQuantity(item.id, -1)} className="flex h-6 w-6 items-center justify-center rounded-md text-textSecondary hover:bg-sand" aria-label={`Decrease ${item.name} quantity`}><Minus size={13} /></button><span className="text-sm font-extrabold">{item.quantity}</span><button onClick={() => updateQuantity(item.id, 1)} className="flex h-6 w-6 items-center justify-center rounded-md text-primary hover:bg-sand" aria-label={`Increase ${item.name} quantity`}><Plus size={13} /></button></div><p className="mt-1 text-[10px] font-bold text-textSecondary">Area (sq ft)</p><p className="text-sm font-extrabold">{area.toFixed(2)}</p></div>
+                <div className="h-20 w-20 shrink-0 rounded-xl border border-black/5 shadow-inner bg-cover bg-center" style={{ backgroundImage: bgThumbnail }} aria-label={`${item.name} sample`} />
+                <div className="min-w-0 flex-1"><p className="truncate text-sm font-extrabold">{item.name}</p><p className="mt-1 text-xs text-textSecondary">{item.size || 'Standard Size'}</p><p className="mt-1 text-xs text-textSecondary">{item.finish || 'Standard'} · {formatRupee(item.price)}</p>{calculatorKey === 'area_wastage' && <p className="mt-2 text-xs font-bold text-primary">{area.toFixed(2)} sq ft</p>}</div>
+                <div className="flex w-[110px] shrink-0 flex-col rounded-xl border border-border bg-[#FCFBF9] p-2.5"><div className="flex items-center justify-between"><span className="text-[10px] font-bold text-textSecondary">Qty (pcs)</span><button onClick={() => removeItem(item.id)} className="text-textSecondary transition-colors hover:text-error" aria-label={`Remove ${item.name}`}><Trash2 size={14} /></button></div><div className="mt-1 flex items-center justify-between"><button onClick={() => updateQuantity(item.id, -1)} className="flex h-6 w-6 items-center justify-center rounded-md text-textSecondary hover:bg-sand" aria-label={`Decrease ${item.name} quantity`}><Minus size={13} /></button><span className="text-sm font-extrabold">{item.quantity}</span><button onClick={() => updateQuantity(item.id, 1)} className="flex h-6 w-6 items-center justify-center rounded-md text-primary hover:bg-sand" aria-label={`Increase ${item.name} quantity`}><Plus size={13} /></button></div>{calculatorKey === 'area_wastage' && <><p className="mt-1 text-[10px] font-bold text-textSecondary">Area (sq ft)</p><p className="text-sm font-extrabold">{area.toFixed(2)}</p></>}</div>
               </div>
             </div>;
           })}
@@ -127,11 +205,17 @@ const QuoteBuilder = () => {
         <div className="mx-3 mb-3 flex items-center justify-between rounded-xl bg-[linear-gradient(105deg,#FBE7CC,#F5D8A9)] px-4 py-3.5"><span className="text-sm font-extrabold text-textPrimary">Total amount</span><span className="text-xl font-extrabold tracking-tight text-textPrimary">{formatRupee(summary.total)}</span></div>
       </section>
 
-      <div className="sticky bottom-20 z-10 mt-5 bg-background/95 py-3 backdrop-blur"><Button onClick={shareQuote} className="h-14 w-full gap-2 text-base">{isShareReady ? <><Check size={19} /> Quote ready to share</> : <><Send size={19} /> Share Quote</>}</Button><p className="mt-2 text-center text-[11px] text-textSecondary">A PDF and WhatsApp delivery flow will be connected next.</p></div>
+      <div className="sticky bottom-20 z-10 mt-5 bg-background/95 py-3 backdrop-blur"><Button onClick={shareQuote} disabled={isSaving} className="h-14 w-full gap-2 text-base">{isSaving ? <><Loader2 size={19} className="animate-spin" /> Saving Quote...</> : isShareReady ? <><Check size={19} /> Quote Saved & Ready to Share</> : <><Send size={19} /> Save & Share Quote</>}</Button><p className="mt-2 text-center text-[11px] text-textSecondary">A PDF and WhatsApp delivery flow will be connected next.</p></div>
 
-      {isCustomerPickerOpen && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-primary/55 p-0 sm:items-center sm:p-4"><div className="w-full max-w-md rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl"><div className="flex items-center justify-between border-b border-border p-4"><div><p className="eyebrow">Quote for</p><h3 className="mt-0.5 text-lg font-extrabold">Choose customer</h3></div><button onClick={() => setIsCustomerPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-textSecondary hover:bg-sand" aria-label="Close customer picker"><X size={19} /></button></div><div className="p-3">{customers.map((person) => <button key={person.name} onClick={() => { setCustomer(person); setIsCustomerPickerOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-sand ${person.name === customer.name ? 'bg-sand' : ''}`}><div className="flex h-10 w-10 items-center justify-center rounded-full bg-accentSoft text-xs font-extrabold text-[#9A482A]">{person.initials}</div><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{person.name}</p><p className="mt-0.5 text-xs text-textSecondary">{person.project} · {person.location}</p></div>{person.name === customer.name && <Check size={17} className="text-success" />}</button>)}</div></div></div>}
+      {isCustomerPickerOpen && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-primary/55 p-0 sm:items-center sm:p-4"><div className="w-full max-w-md rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl"><div className="flex items-center justify-between border-b border-border p-4"><div><p className="eyebrow">Quote for</p><h3 className="mt-0.5 text-lg font-extrabold">Choose customer</h3></div><button onClick={() => setIsCustomerPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-textSecondary hover:bg-sand" aria-label="Close customer picker"><X size={19} /></button></div><div className="p-3 max-h-[60vh] overflow-y-auto">{customers.length === 0 ? <p className="text-center text-sm text-textSecondary py-4">No customers found. Create one first.</p> : customers.map((person) => <button key={person.id} onClick={() => { setCustomer(person); setIsCustomerPickerOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-sand ${person.id === customer?.id ? 'bg-sand' : ''}`}><div className="flex h-10 w-10 items-center justify-center rounded-full bg-accentSoft text-xs font-extrabold text-[#9A482A]">{person.name.substring(0,2).toUpperCase()}</div><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{person.name}</p><p className="mt-0.5 text-xs text-textSecondary">{person.project_type || 'General'} · {person.location || 'Unknown'}</p></div>{person.id === customer?.id && <Check size={17} className="text-success" />}</button>)}</div></div></div>}
 
-      {isProductPickerOpen && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-primary/55 p-0 sm:items-center sm:p-4"><div className="w-full max-w-md rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl"><div className="flex items-center justify-between border-b border-border p-4"><div><p className="eyebrow">Catalogue</p><h3 className="mt-0.5 text-lg font-extrabold">Add product</h3></div><button onClick={() => setIsProductPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-textSecondary hover:bg-sand" aria-label="Close product picker"><X size={19} /></button></div><div className="p-3">{catalogue.map((tile) => <button key={tile.id} onClick={() => addItem(tile)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-sand"><div className="h-12 w-12 shrink-0 rounded-xl border border-black/5" style={{ background: tile.thumbnail }} /><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{tile.name}</p><p className="mt-0.5 text-xs text-textSecondary">{tile.size} · {tile.finish}</p></div><span className="text-xs font-extrabold text-primary">{items.some((item) => item.id === tile.id) ? 'Added' : 'Add'}</span></button>)}</div></div></div>}
+      {isProductPickerOpen && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-primary/55 p-0 sm:items-center sm:p-4"><div className="w-full max-w-md rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between border-b border-border p-4 shrink-0"><div><p className="eyebrow">Catalogue</p><h3 className="mt-0.5 text-lg font-extrabold">Add product</h3></div><button onClick={() => setIsProductPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-textSecondary hover:bg-sand" aria-label="Close product picker"><X size={19} /></button></div>
+        <div className="border-b border-border p-3 shrink-0"><div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary" /><input type="text" placeholder="Search products..." value={productSearchQuery} onChange={(e) => setProductSearchQuery(e.target.value)} className="w-full rounded-xl border border-border bg-[#FCFBF9] py-2.5 pl-9 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" /></div></div>
+        <div className="p-3 overflow-y-auto">{products.filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase())).length === 0 ? <p className="text-center text-sm text-textSecondary py-4">{products.length === 0 ? 'No products found. Add products to your catalogue first.' : 'No products match your search.'}</p> : products.filter(p => p.name.toLowerCase().includes(productSearchQuery.toLowerCase())).map((tile) => {
+        const bgThumbnail = tile.image_url ? `url(${tile.image_url})` : 'linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%)';
+        return <button key={tile.id} onClick={() => addItem(tile)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-sand"><div className="h-12 w-12 shrink-0 rounded-xl border border-black/5 bg-cover bg-center" style={{ backgroundImage: bgThumbnail }} /><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{tile.name}</p><p className="mt-0.5 text-xs text-textSecondary">{tile.size || 'Standard'} · {tile.finish || 'Standard'}</p></div><span className="text-xs font-extrabold text-primary">{items.some((item) => item.id === tile.id) ? 'Added' : 'Add'}</span></button>
+      })}</div></div></div>}
     </div>
   );
 };

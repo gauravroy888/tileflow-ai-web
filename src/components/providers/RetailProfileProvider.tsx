@@ -75,6 +75,51 @@ export const RetailProfileProvider: React.FC<{ children: React.ReactNode, userId
   const profile = retailProfiles[profileId] || retailProfiles['showroom'];
   const modules = shop?.enabled_modules || [];
 
+  // Inject theme variables
+  useEffect(() => {
+    const root = document.documentElement;
+    const themePref = shop?.branding?.theme || 'dynamic';
+    
+    // First, clear all previously injected theme variables
+    const themeKeys = ['primary', 'primaryHover', 'surface', 'surfaceHover', 'background', 'textPrimary', 'textSecondary', 'border', 'accent', 'accentSoft', 'success', 'warning', 'error', 'sand', 'stone', 'hero', 'heroText'];
+    themeKeys.forEach(key => root.style.removeProperty(`--theme-${key}`));
+
+    let themeToApply: Record<string, string> | undefined = undefined;
+    if (themePref === 'dynamic' && profile.theme) {
+      themeToApply = {
+        ...profile.theme,
+        hero: (profile.theme as any).primary,
+        heroText: '#FFFFFF',
+      } as Record<string, string>;
+    } else if (themePref === 'dark') {
+      themeToApply = {
+        primary: '#FFFFFF',
+        primaryHover: '#E5E7EB',
+        surface: '#121212',
+        surfaceHover: '#1E1E1E',
+        background: '#050505',
+        textPrimary: '#FFFFFF',
+        textSecondary: '#A3A3A3',
+        border: '#262626',
+        accent: '#D1D5DB',
+        accentSoft: '#1A1A1A',
+        success: '#D1D5DB',
+        warning: '#D1D5DB',
+        error: '#D1D5DB',
+        sand: '#1A1A1A',
+        stone: '#333333',
+        hero: '#121212', // Matches surface
+        heroText: '#FFFFFF'
+      };
+    }
+
+    if (themeToApply) {
+      Object.entries(themeToApply).forEach(([key, value]) => {
+        root.style.setProperty(`--theme-${key}`, value);
+      });
+    }
+  }, [profile.theme, shop?.branding?.theme]);
+
   const contextValue: RetailProfileContextType = {
     shop,
     profile,

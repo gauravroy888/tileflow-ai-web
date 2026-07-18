@@ -21,8 +21,8 @@ const More = () => {
         <p className="mt-1 text-sm text-textSecondary">Manage the way your showroom works.</p>
       </header>
 
-      <section className="rounded-2xl bg-primary p-5 text-white shadow-[0_14px_32px_rgba(13,45,77,0.16)]">
-        <div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-[#F5C4AA]"><Settings2 size={21} /></div><div><p className="text-sm font-extrabold">RetailFlow workspace</p><p className="mt-1 text-sm leading-5 text-white/70">Set up your team, customer experience and showroom preferences.</p></div></div>
+      <section className="rounded-2xl bg-hero p-5 text-heroText shadow-[0_14px_32px_rgba(13,45,77,0.16)]">
+        <div className="flex items-start gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-heroText/20 text-heroText"><Settings2 size={21} /></div><div><p className="text-sm font-extrabold">RetailFlow workspace</p><p className="mt-1 text-sm leading-5 text-heroText/70">Set up your team, customer experience and showroom preferences.</p></div></div>
       </section>
 
       <section className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
@@ -46,7 +46,7 @@ const More = () => {
         })}
       </section>
 
-      <button onClick={() => supabase.auth.signOut()} className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#E7B8B8] bg-[#FFF8F8] py-3.5 text-sm font-extrabold text-error transition-colors hover:bg-[#FDEEEE]"><LogOut size={17} /> Sign out</button>
+      <button onClick={() => supabase.auth.signOut()} className="flex w-full items-center justify-center gap-2 rounded-xl border border-error/20 bg-error/5 py-3.5 text-sm font-extrabold text-error transition-colors hover:bg-error/10"><LogOut size={17} /> Sign out</button>
     </div>
   );
 };

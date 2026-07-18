@@ -56,7 +56,7 @@ const Login = () => {
       <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-[#E2ECF3] blur-3xl" />
       <div className="pointer-events-none absolute -bottom-28 -right-20 h-72 w-72 rounded-full bg-[#F3DFD4] blur-3xl" />
       <div className="relative sm:mx-auto sm:w-full sm:max-w-sm">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_14px_30px_rgba(13,45,77,0.2)]"><Grid2X2 size={25} /></div>
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-background shadow-[0_14px_30px_rgba(13,45,77,0.2)]"><Grid2X2 size={25} /></div>
         <div className="mt-5 text-center">
           <p className="eyebrow">Showroom sales workspace</p>
           <h2 className="mt-1 text-3xl font-extrabold tracking-tight text-primary">{t('app_name')}</h2>

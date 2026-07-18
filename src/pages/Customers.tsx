@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, UserPlus, X, Plus, Check, Minus, UsersRound } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, Product } from '../types';
@@ -18,6 +19,7 @@ const STATUS_FILTERS = [
 ];
 
 const Customers = () => {
+  const { t } = useTranslation();
   const { labels } = useRetailProfile();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,29 +256,29 @@ const Customers = () => {
     <div className="page-shell mx-auto max-w-screen-xl space-y-5">
       <header className="flex items-end justify-between gap-3">
         <div>
-          <p className="eyebrow">Sales pipeline</p>
-          <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">Customers</h2>
-          <p className="mt-1 text-sm text-textSecondary">Keep every {labels.customerVisitLabel || 'visit'} moving forward.</p>
+          <p className="eyebrow">{t('customers.breadcrumb')}</p>
+          <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">{t('customers.title')}</h2>
+          <p className="mt-1 text-sm text-textSecondary">{t('customers.subtitle', { item: labels.customerVisit || 'visit' })}</p>
         </div>
         <Button size="sm" className="shrink-0 gap-1.5" onClick={handleOpenModal}>
-          <UserPlus size={17} /> Add {labels.customerVisitLabel || 'lead'}
+          <UserPlus size={17} /> {t('customers.add_new')}
         </Button>
       </header>
 
-      <div className="rounded-2xl border border-[#F1D9CD] bg-accentSoft px-4 py-3">
+      <div className="rounded-2xl border border-accent/20 bg-accentSoft px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-accent shadow-sm"><UsersRound size={19} /></div>
-          <div className="min-w-0 flex-1"><p className="text-sm font-extrabold text-textPrimary">{followUpCount} follow-ups need attention</p><p className="mt-0.5 text-xs text-[#9A482A]">Keep the next conversation close to hand.</p></div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-extrabold text-textPrimary">{t('customers.follow_ups', { count: followUpCount })}</p><p className="mt-0.5 text-xs text-accent">{t('customers.follow_ups_sub')}</p></div>
         </div>
       </div>
 
       <label className="relative block">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textSecondary" size={19} />
-        <input type="search" placeholder="Search customers..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-surface pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+        <input type="search" placeholder={t('customers.search')} value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-surface pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
       </label>
 
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6">
-        {STATUS_FILTERS.map((filter) => <button key={filter.id} onClick={() => setActiveStatus(filter.id)} className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-extrabold transition-colors ${activeStatus === filter.id ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-textSecondary hover:border-primary/30 hover:text-primary'}`}>{filter.label}</button>)}
+        {STATUS_FILTERS.map((filter) => <button key={filter.id} onClick={() => setActiveStatus(filter.id)} className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-extrabold transition-colors ${activeStatus === filter.id ? 'border-primary bg-primary text-background' : 'border-border bg-surface text-textSecondary hover:border-primary/30 hover:text-primary'}`}>{t(`customers.status.${filter.id}`)}</button>)}
       </div>
 
       {/* Customers List */}
@@ -289,9 +291,9 @@ const Customers = () => {
       ) : filteredCustomers.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-stone bg-surface px-6 py-14 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-primary"><UsersRound size={22} /></div>
-          <p className="mt-4 font-extrabold text-textPrimary">No customers found</p>
-          <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-textSecondary">Add a new {labels.customerVisitLabel.toLowerCase() || 'lead'} to keep their requirements, products and follow-ups together.</p>
-          <Button className="mt-5 gap-2" onClick={handleOpenModal}><UserPlus size={17} /> Add {labels.customerVisitLabel || 'lead'}</Button>
+          <p className="mt-4 font-extrabold text-textPrimary">{t('customers.no_customers')}</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-textSecondary">{t('customers.no_customers_sub', { item: (labels.customerVisit || 'lead').toLowerCase() })}</p>
+          <Button className="mt-5 gap-2" onClick={handleOpenModal}><UserPlus size={17} /> {t('customers.add_new')}</Button>
         </div>
       ) : (
         <div className="space-y-3">
@@ -307,7 +309,7 @@ const Customers = () => {
           <div className="bg-surface w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-              <h3 className="font-bold text-lg text-textPrimary">{editingCustomerId ? 'Edit Customer' : 'Add New Customer'}</h3>
+              <h3 className="font-bold text-lg text-textPrimary">{editingCustomerId ? t('customers.edit_customer') : t('customers.add_customer')}</h3>
               <button onClick={() => setIsModalOpen(false)} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
                 <X size={20} />
               </button>
@@ -317,10 +319,10 @@ const Customers = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-textPrimary mb-1">Name <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-medium text-textPrimary mb-1">{t('common.name')} <span className="text-red-500">*</span></label>
                 <input
                   type="text"
-                  placeholder="e.g. Rahul Sharma"
+                  placeholder={t('customers.placeholder.name')}
                   value={form.name}
                   onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                   className="w-full border border-border rounded-xl px-3 py-2.5 bg-background text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary text-sm"
@@ -329,10 +331,10 @@ const Customers = () => {
 
               {/* Phone */}
               <div>
-                <label className="block text-sm font-medium text-textPrimary mb-1">Phone</label>
+                <label className="block text-sm font-medium text-textPrimary mb-1">{t('common.phone')}</label>
                 <input
                   type="tel"
-                  placeholder="e.g. +91 98765 43210"
+                  placeholder={t('customers.placeholder.phone')}
                   value={form.phone}
                   onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                   className="w-full border border-border rounded-xl px-3 py-2.5 bg-background text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary text-sm"
@@ -342,7 +344,7 @@ const Customers = () => {
               {/* Budget & Location */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-textPrimary mb-1">Budget (₹)</label>
+                  <label className="block text-sm font-medium text-textPrimary mb-1">{t('common.budget')}</label>
                   <input
                     type="number"
                     placeholder="e.g. 50000"
@@ -352,10 +354,10 @@ const Customers = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-textPrimary mb-1">Location</label>
+                  <label className="block text-sm font-medium text-textPrimary mb-1">{t('common.location')}</label>
                   <input
                     type="text"
-                    placeholder="e.g. Mumbai"
+                    placeholder={t('customers.placeholder.location')}
                     value={form.location}
                     onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
                     className="w-full border border-border rounded-xl px-3 py-2.5 bg-background text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary text-sm"
@@ -366,31 +368,31 @@ const Customers = () => {
               {/* Project Type & Status */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-textPrimary mb-1">Project Type</label>
+                  <label className="block text-sm font-medium text-textPrimary mb-1">{t('common.project_type')}</label>
                   <select
                     value={form.project_type}
                     onChange={e => setForm(f => ({ ...f, project_type: e.target.value }))}
                     className="w-full border border-border rounded-xl px-3 py-2.5 bg-background text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                   >
-                    <option value="">Select...</option>
+                    <option value="">{t('common.select')}</option>
                     {PROJECT_TYPES.map(pt => <option key={pt} value={pt}>{pt}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-textPrimary mb-1">Status</label>
+                  <label className="block text-sm font-medium text-textPrimary mb-1">{t('common.status')}</label>
                   <select
                     value={form.visit_status}
                     onChange={e => setForm(f => ({ ...f, visit_status: e.target.value }))}
                     className="w-full border border-border rounded-xl px-3 py-2.5 bg-background text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                   >
-                    {VISIT_STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                    {VISIT_STATUSES.map(s => <option key={s} value={s}>{t(`customers.status.${s}`)}</option>)}
                   </select>
                 </div>
               </div>
 
               {/* Products Required Picker */}
               <div>
-                <label className="block text-sm font-medium text-textPrimary mb-2">Products Required</label>
+                <label className="block text-sm font-medium text-textPrimary mb-2">{t('customers.products_required')}</label>
                 <div className="flex items-center gap-3 overflow-x-auto pb-2">
                   {selectedProducts.map(sp => (
                     <div key={sp.product.id} className="relative w-20 shrink-0 flex flex-col gap-2">
@@ -492,7 +494,7 @@ const Customers = () => {
                         </div>
                         <div className="p-2 bg-surface text-xs font-medium truncate" title={p.name}>{p.name}</div>
                         {isSelected && (
-                          <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1 shadow-md">
+                          <div className="absolute top-2 right-2 bg-primary text-background rounded-full p-1 shadow-md">
                             <Check size={14} />
                           </div>
                         )}

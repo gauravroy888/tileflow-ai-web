@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowRight, Box, Camera, Check, ClipboardList, Image as ImageIcon, MessageSquare, PackageSearch, Paintbrush, Plus, Send, Sparkles, TrendingUp, X } from 'lucide-react';
+import { ArrowRight, Camera, Check, ClipboardList, PackageSearch, Plus, Send, Sparkles, TrendingUp, X } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
+import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import type { Product, Customer } from '../types';
 
-type ToolType = 'chat' | 'visualize' | 'style' | 'object' | null;
+type ToolType = string | null;
 
 interface Message {
   role: 'user' | 'assistant';
@@ -12,12 +13,14 @@ interface Message {
 }
 
 const chatSuggestions = [
-  { label: 'Showroom follow-ups', prompt: 'Which customers should I follow up with today?', icon: ClipboardList, tone: 'bg-[#EEF5FC] text-[#315B91]' },
-  { label: 'Check my stock', prompt: 'What products do I currently have in my catalogue?', icon: PackageSearch, tone: 'bg-[#F8F0E6] text-[#AD681C]' },
-  { label: 'Sales idea', prompt: 'Suggest a simple way to improve sales this week.', icon: TrendingUp, tone: 'bg-[#F2EBF9] text-[#7D3FB5]' },
+  { label: 'Showroom follow-ups', prompt: 'Which customers should I follow up with today?', icon: ClipboardList, tone: 'bg-primary/10 text-primary' },
+  { label: 'Check my stock', prompt: 'What products do I currently have in my catalogue?', icon: PackageSearch, tone: 'bg-warning/10 text-warning' },
+  { label: 'Sales idea', prompt: 'Suggest a simple way to improve sales this week.', icon: TrendingUp, tone: 'bg-accent/10 text-accent' },
 ];
 
 const AI = () => {
+  const { profile } = useRetailProfile();
+
   // Chat State
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -155,15 +158,13 @@ const AI = () => {
       const parts: any[] = [];
       const imageParts: any[] = [];
 
-      if (activeTool === 'visualize') {
-        prompt = `You are an expert interior designer. The user wants to visualize a retail space. Based on this description, provide a very detailed, vivid written description of what this space looks like — as if you are describing the final result of the design to a client. Include colors, materials, lighting, layout, and atmosphere. Description: "${toolPrompt}"`;
-      } else if (activeTool === 'style' && uploadedImage) {
+      const activeFeature = profile.aiFeatures.find(f => f.id === activeTool);
+      if (!activeFeature) return;
+
+      prompt = activeFeature.systemPrompt.replace('{prompt}', toolPrompt);
+
+      if (['vision_with_image', 'image_generation'].includes(activeFeature.type) && uploadedImage) {
         const base64Data = uploadedImage.split(',')[1];
-        prompt = `You are an expert interior designer. The user has uploaded a photo of a space and wants to change its style. Analyze the current space and then describe in vivid detail what it would look like after applying this style change: "${toolPrompt}". Be specific about colors, materials, textures, and atmosphere.`;
-        imageParts.push({ inlineData: { mimeType: uploadedImageMime, data: base64Data } });
-      } else if (activeTool === 'object' && uploadedImage) {
-        const base64Data = uploadedImage.split(',')[1];
-        prompt = `You are an expert interior designer. The user has uploaded a photo of a space and wants to place an object in it. Analyze the current space carefully and describe in vivid detail what it would look like with this addition: "${toolPrompt}". Mention exactly where the object would go, how it fits with the existing decor, and what impact it has on the overall look.`;
         imageParts.push({ inlineData: { mimeType: uploadedImageMime, data: base64Data } });
       }
 
@@ -274,27 +275,30 @@ const AI = () => {
                 <div className="hidden h-10 w-10 items-center justify-center rounded-xl bg-accentSoft text-accent sm:flex"><Sparkles size={19} /></div>
               </header>
 
-              <button onClick={() => setActiveTool('visualize')} className="group relative w-full overflow-hidden rounded-2xl bg-primary p-5 text-left text-white shadow-[0_16px_32px_rgba(13,45,77,0.18)] transition-transform hover:-translate-y-0.5">
-                <div className="absolute -right-9 -top-10 h-40 w-40 rounded-full border-[18px] border-white/10" />
-                <div className="absolute bottom-4 right-5 grid grid-cols-3 gap-1 opacity-35"><span className="h-6 w-6 rounded-md border border-white/50" /><span className="h-6 w-6 rounded-md border border-white/30" /><span className="h-6 w-6 rounded-md border border-white/40" /><span className="h-6 w-6 rounded-md border border-white/30" /><span className="h-6 w-6 rounded-md border border-white/50" /><span className="h-6 w-6 rounded-md border border-white/30" /></div>
-                <div className="relative flex max-w-md items-start gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/12 text-[#F5C4AA]"><ImageIcon size={21} /></div>
-                  <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">Visualise a customer’s space</p><p className="mt-1 text-sm leading-5 text-white/70">Start from a room idea and bring your own products into the concept.</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-extrabold text-white">Create a design <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" /></span></div>
-                </div>
-              </button>
+              {(() => {
+                const heroFeature = profile.aiFeatures.find(f => f.isHero);
+                if (!heroFeature) return null;
+                const HeroIcon = heroFeature.icon;
+                return (
+                  <button onClick={() => setActiveTool(heroFeature.id)} className="group relative w-full overflow-hidden rounded-2xl bg-hero p-5 text-left text-heroText shadow-[0_16px_32px_rgba(13,45,77,0.18)] transition-transform hover:-translate-y-0.5">
+                    <div className="absolute -right-9 -top-10 h-40 w-40 rounded-full border-[18px] border-heroText/10" />
+                    <div className="absolute bottom-4 right-5 grid grid-cols-3 gap-1 opacity-35"><span className="h-6 w-6 rounded-md border border-heroText/50" /><span className="h-6 w-6 rounded-md border border-heroText/30" /><span className="h-6 w-6 rounded-md border border-heroText/40" /><span className="h-6 w-6 rounded-md border border-heroText/30" /><span className="h-6 w-6 rounded-md border border-heroText/50" /><span className="h-6 w-6 rounded-md border border-heroText/30" /></div>
+                    <div className="relative flex max-w-md items-start gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-heroText/20 text-heroText"><HeroIcon size={21} /></div>
+                      <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{heroFeature.title}</p><p className="mt-1 text-sm leading-5 text-heroText/70">{heroFeature.description}</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-extrabold text-heroText">{heroFeature.buttonText || 'Use Tool'} <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" /></span></div>
+                    </div>
+                  </button>
+                );
+              })()}
 
               <div className="mt-5 flex items-center gap-2"><span className="h-px flex-1 bg-border" /><p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-textSecondary">Other ways to work</p><span className="h-px flex-1 bg-border" /></div>
               <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {[
-                  { type: 'chat' as const, icon: MessageSquare, title: 'Retail chat', description: 'Ask about customers or stock', color: 'bg-[#E7EFF8] text-[#315B91]' },
-                  { type: 'style' as const, icon: Paintbrush, title: 'Restyle a room', description: 'Refresh an uploaded photo', color: 'bg-[#F3EBFA] text-[#7D3FB5]' },
-                  { type: 'object' as const, icon: Box, title: 'Place a product', description: 'Try a tile in a space', color: 'bg-[#F8ECD5] text-[#B86D13]' },
-                ].map((tool) => {
+                {profile.aiFeatures.filter(f => !f.isHero).map((tool) => {
                   const Icon = tool.icon;
-                  return <button key={tool.type} onClick={() => setActiveTool(tool.type)} className="group min-h-40 rounded-2xl border border-border bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tool.color}`}><Icon size={19} /></div><h3 className="mt-5 text-sm font-extrabold text-textPrimary">{tool.title}</h3><p className="mt-1 text-xs leading-5 text-textSecondary">{tool.description}</p><ArrowRight size={15} className="mt-3 text-textSecondary transition-transform group-hover:translate-x-1 group-hover:text-primary" /></button>;
+                  return <button key={tool.id} onClick={() => setActiveTool(tool.id)} className="group min-h-40 rounded-2xl border border-border bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tool.color}`}><Icon size={19} /></div><h3 className="mt-5 text-sm font-extrabold text-textPrimary">{tool.title}</h3><p className="mt-1 text-xs leading-5 text-textSecondary">{tool.description}</p><ArrowRight size={15} className="mt-3 text-textSecondary transition-transform group-hover:translate-x-1 group-hover:text-primary" /></button>;
                 })}
               </div>
-              <p className="mt-5 rounded-xl border border-[#DDE7F4] bg-[#F4F8FC] px-3.5 py-3 text-xs leading-5 text-[#315B91]"><span className="font-extrabold">Tip:</span> Add product images from your catalogue for a concept that is closer to what you can actually sell.</p>
+              <p className="mt-5 rounded-xl border border-primary/20 bg-primary/5 px-3.5 py-3 text-xs leading-5 text-primary"><span className="font-extrabold">Tip:</span> Add product images from your catalogue for a concept that is closer to what you can actually sell.</p>
             </div>
           </div>
         ) : (
@@ -303,12 +307,12 @@ const AI = () => {
             <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 shrink-0">
               <button 
                 onClick={() => { setActiveTool(null); setUploadedImage(null); setGeneratedText(null); setToolPrompt(''); }} 
-                className="rounded-xl bg-sand px-3 py-2 text-xs font-extrabold text-textSecondary transition-colors hover:bg-primary hover:text-white"
+                className="rounded-xl bg-sand px-3 py-2 text-xs font-extrabold text-textSecondary transition-colors hover:bg-primary hover:text-background"
               >
                 ← Back
               </button>
               <h3 className="text-base font-extrabold text-textPrimary">
-                {activeTool === 'chat' ? 'Retail Assistant' : activeTool === 'style' ? 'Analyze & Restyle' : activeTool === 'visualize' ? 'Visualize Space' : 'Place Object'}
+                {profile.aiFeatures.find(f => f.id === activeTool)?.title || 'AI Tool'}
               </h3>
             </div>
 
@@ -318,14 +322,14 @@ const AI = () => {
                 <div className="flex-1 overflow-y-auto bg-background p-4">
                   {messages.length === 0 && (
                     <div className="mx-auto flex min-h-full max-w-xl flex-col justify-center py-3">
-                      <section className="relative overflow-hidden rounded-3xl bg-primary px-5 py-6 text-white shadow-[0_18px_35px_rgba(13,45,77,0.18)]">
-                        <div className="absolute -right-7 -top-8 h-28 w-28 rounded-full border-[14px] border-white/10" />
-                        <div className="absolute bottom-3 right-7 text-white/10"><Sparkles size={62} strokeWidth={1.3} /></div>
+                      <section className="relative overflow-hidden rounded-3xl bg-hero px-5 py-6 text-heroText shadow-[0_18px_35px_rgba(13,45,77,0.18)]">
+                        <div className="absolute -right-7 -top-8 h-28 w-28 rounded-full border-[14px] border-heroText/10" />
+                        <div className="absolute bottom-3 right-7 text-heroText/10"><Sparkles size={62} strokeWidth={1.3} /></div>
                         <div className="relative">
-                          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/12 text-[#F5C4AA]"><Sparkles size={20} /></div>
+                          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-heroText/20 text-heroText"><Sparkles size={20} /></div>
                           <p className="text-lg font-extrabold tracking-tight">Your showroom co-pilot</p>
-                          <p className="mt-1 max-w-sm text-sm leading-5 text-white/75">Ask about customers, products, or the next best move for your business.</p>
-                          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/85"><span className="h-1.5 w-1.5 rounded-full bg-[#9BE4C7]" /> Ready with your store context</div>
+                          <p className="mt-1 max-w-sm text-sm leading-5 text-heroText/75">Ask about customers, products, or the next best move for your business.</p>
+                          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-heroText/20 px-2.5 py-1 text-[11px] font-bold text-heroText/90"><span className="h-1.5 w-1.5 rounded-full bg-success" /> Ready with your store context</div>
                         </div>
                       </section>
 
@@ -347,13 +351,13 @@ const AI = () => {
                   )}
                   {messages.length > 0 && (
                     <div className="mx-auto max-w-2xl space-y-4">
-                      <p className="rounded-xl border border-[#DDE7F4] bg-[#F4F8FC] px-3 py-2 text-center text-xs text-[#315B91]"><span className="font-extrabold">Retail context enabled.</span> Your catalogue and customer records inform this chat.</p>
+                      <p className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-center text-xs text-primary"><span className="font-extrabold">Retail context enabled.</span> Your catalogue and customer records inform this chat.</p>
                       {messages.map((msg, i) => (
                         <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          {msg.role === 'assistant' && <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Sparkles size={15} /></span>}
+                          {msg.role === 'assistant' && <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-background"><Sparkles size={15} /></span>}
                           <div className={`max-w-[80%] px-3.5 py-3 text-sm leading-6 ${
                             msg.role === 'user' 
-                              ? 'rounded-2xl rounded-br-md bg-primary text-white shadow-sm' 
+                              ? 'rounded-2xl rounded-br-md bg-primary text-background shadow-sm' 
                               : 'rounded-2xl rounded-bl-md border border-border bg-surface text-textPrimary shadow-sm'
                           }`}>
                             {msg.content}
@@ -364,7 +368,7 @@ const AI = () => {
                   )}
                   {loadingChat && (
                     <div className="mx-auto mt-4 flex max-w-2xl justify-start gap-2.5">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Sparkles size={15} /></span>
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-background"><Sparkles size={15} /></span>
                       <div className="rounded-2xl rounded-bl-md border border-border bg-surface px-3.5 py-3 text-sm text-textSecondary shadow-sm"><span className="inline-flex gap-1"><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-textSecondary [animation-delay:-0.2s]" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-textSecondary [animation-delay:-0.1s]" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-textSecondary" /></span></div>
                     </div>
                   )}
@@ -388,11 +392,11 @@ const AI = () => {
             ) : (
               // OTHER TOOLS VIEW
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {(activeTool === 'style' || activeTool === 'object') && (
+                {['vision_with_image', 'image_generation'].includes(profile.aiFeatures.find(f => f.id === activeTool)?.type || '') && (
                   <div>
                     <label className="block text-sm font-medium text-textPrimary mb-2">Upload Photo</label>
                     {uploadedImage ? (
-                      <div className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden border border-border">
+                      <div className="relative aspect-video bg-sand rounded-xl overflow-hidden border border-border">
                         <img src={uploadedImage} alt="Uploaded" className="w-full h-full object-cover" />
                         <button onClick={() => setUploadedImage(null)} className="absolute top-2 right-2 bg-black/50 text-white p-2 rounded-full hover:bg-black/70">
                           ✕
@@ -401,9 +405,9 @@ const AI = () => {
                     ) : (
                       <div 
                         onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-primary cursor-pointer transition-colors"
+                        className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center text-textSecondary hover:bg-sand/50 hover:border-primary cursor-pointer transition-colors"
                       >
-                        <Camera size={32} className="mb-2 text-gray-400" />
+                        <Camera size={32} className="mb-2 text-textSecondary/50" />
                         <p className="text-sm font-medium">Tap to upload a photo</p>
                       </div>
                     )}
@@ -417,9 +421,9 @@ const AI = () => {
                     value={toolPrompt}
                     onChange={(e) => setToolPrompt(e.target.value)}
                     placeholder={
-                      activeTool === 'visualize' ? "e.g. A modern minimalist tile showroom with bright lighting and marble displays..." :
-                      activeTool === 'style' ? "e.g. Make it look like a luxury showroom with gold accents..." :
-                      "e.g. Place large format grey marble tiles on the floor..."
+                      profile.aiFeatures.find(f => f.id === activeTool)?.type === 'image_generation' 
+                        ? "e.g. A modern minimalist showroom with bright lighting..." 
+                        : "Describe what you want to do..."
                     }
                     className="w-full border border-border rounded-xl p-3 bg-surface text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px] resize-none"
                   />
@@ -429,11 +433,11 @@ const AI = () => {
                   <label className="block text-sm font-medium text-textPrimary mb-2">Attach from Inventory (Up to 5)</label>
                   <div className="flex items-center gap-3 overflow-x-auto pb-2">
                     {selectedProducts.map(p => (
-                      <div key={p.id} className="relative w-20 h-20 rounded-xl bg-gray-100 shrink-0 border border-border">
+                      <div key={p.id} className="relative w-20 h-20 rounded-xl bg-sand shrink-0 border border-border">
                          {p.image_url ? (
                             <img src={p.image_url} alt={p.name} className="w-full h-full object-cover rounded-xl" />
                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Img</div>
+                            <div className="w-full h-full flex items-center justify-center text-xs text-textSecondary/50">No Img</div>
                          )}
                          <button onClick={() => setSelectedProducts(prev => prev.filter(sp => sp.id !== p.id))} className="absolute -top-2 -right-2 bg-black text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-500 shadow-md">
                            <X size={14} />
@@ -441,7 +445,7 @@ const AI = () => {
                       </div>
                     ))}
                     {selectedProducts.length < 5 && (
-                      <button onClick={() => setIsPickerOpen(true)} className="flex flex-col items-center justify-center px-4 py-2 h-20 bg-surface border-2 border-dashed border-border rounded-xl text-textSecondary font-medium hover:bg-gray-50 hover:border-primary hover:text-primary transition-colors shrink-0">
+                      <button onClick={() => setIsPickerOpen(true)} className="flex flex-col items-center justify-center px-4 py-2 h-20 bg-surface border-2 border-dashed border-border rounded-xl text-textSecondary font-medium hover:bg-sand/50 hover:border-primary hover:text-primary transition-colors shrink-0">
                         <Plus size={20} className="mb-1" />
                         <span className="text-[10px] whitespace-nowrap">Add Item</span>
                       </button>
@@ -516,7 +520,7 @@ const AI = () => {
                         </div>
                         <div className="p-2 bg-surface text-xs font-medium truncate" title={p.name}>{p.name}</div>
                         {isSelected && (
-                          <div className="absolute top-2 right-2 bg-primary text-white rounded-full p-1 shadow-md">
+                          <div className="absolute top-2 right-2 bg-primary text-background rounded-full p-1 shadow-md">
                             <Check size={14} />
                           </div>
                         )}

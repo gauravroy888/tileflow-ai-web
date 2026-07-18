@@ -1,5 +1,14 @@
 {
   "app_name": "RetailFlow AI",
+  "common": {
+    "name": "नाम",
+    "phone": "फ़ोन",
+    "budget": "बजट (\u20B9)",
+    "location": "स्थान",
+    "project_type": "प्रोजेक्ट का प्रकार",
+    "status": "स्थिति",
+    "select": "चुनें..."
+  },
   "login": {
     "title": "अपने खाते में साइन इन करें",
     "email": "ईमेल पता",
@@ -16,15 +25,6 @@
     "ai": "AI",
     "more": "अधिक"
   },
-  "onboarding": {
-    "title": "RetailFlow AI में आपका स्वागत है",
-    "subtitle": "आइए अपना व्यवसाय प्रोफ़ाइल सेट करें",
-    "shop_name": "व्यवसाय का नाम",
-    "shop_type": "खुदरा प्रकार (Retail Type)",
-    "shop_type_placeholder": "जैसे कपड़े, इलेक्ट्रॉनिक्स, किराने का सामान",
-    "save": "सेटअप पूरा करें",
-    "saving": "सहेजा जा रहा है..."
-  },
   "dashboard": {
     "title": "डैशबोर्ड",
     "sign_out": "साइन आउट करें",
@@ -34,23 +34,70 @@
     "ai_quick_actions": "AI त्वरित कार्रवाई",
     "inventory_scanner": "इन्वेंटरी स्कैनर",
     "sales_analytics": "बिक्री एनालिटिक्स",
-    "find_similar": "समान उत्पाद खोजें"
+    "find_similar": "समान उत्पाद खोजें",
+    "ai_visualise": "जगह की कल्पना करें",
+    "ai_compare": "उत्पाद तुलना",
+    "ai_reminders": "फ़ॉलो-अप ड्राफ़्ट करें",
+    "ai_assistant": "AI असिस्टेंट",
+    "ai_visualise_desc": "डिज़ाइन कॉन्सेप्ट बनाने के लिए शोरूम उत्पादों का उपयोग करें।",
+    "ai_compare_desc": "विनिर्देशों और वारंटी की तुरंत तुलना करें।",
+    "ai_reminders_desc": "विनम्र अपॉइंटमेंट रिमाइंडर जनरेट करें।",
+    "ai_assistant_desc": "अपने दैनिक कार्यों के लिए AI का लाभ उठाएं।",
+    "date": "आज",
+    "welcome": "आपका शोरूम, शानदार फ्लो में।",
+    "subtitle": "ग्राहक फॉलो-अप में आगे रहें और उत्पादों की रुचि को कोटेशन में बदलें।",
+    "add_lead": "लीड जोड़ें",
+    "create_quote": "कोट बनाएं",
+    "glance": "आज की एक झलक",
+    "workspace": "बिक्री कार्यस्थान",
+    "updated": "अभी अपडेट किया गया",
+    "follow_ups": "बाकी फॉलो-अप",
+    "deals": "सौदे जारी रखें",
+    "attention": "ध्यान देने योग्य फॉलो-अप",
+    "view_all": "सभी देखें",
+    "follow_up_action": "फॉलो-अप करें"
   },
   "products": {
     "title": "उत्पाद",
     "add_new": "नया जोड़ें",
     "search": "नाम, SKU से खोजें...",
     "no_products": "कोई उत्पाद नहीं मिला।",
+    "no_products_desc": "अपनी डिजिटल कैटलॉग बनाना शुरू करने के लिए अपना पहला उत्पाद जोड़ें।",
     "price_sqft": "कीमत",
     "in_stock": "स्टॉक में",
-    "out_of_stock": "स्टॉक खत्म"
+    "out_of_stock": "स्टॉक खत्म",
+    "all_items": "सभी आइटम",
+    "low_stock": "कम स्टॉक",
+    "workspace": "कैटलॉग कार्यस्थान",
+    "in_catalogue": "आइटम कैटलॉग में",
+    "low_stock_label": "कम स्टॉक"
   },
   "customers": {
     "title": "ग्राहक",
     "add_new": "नया जोड़ें",
     "search": "नाम, फोन से खोजें...",
     "no_customers": "कोई ग्राहक नहीं मिला।",
+    "no_customers_sub": "उनकी आवश्यकताएं, उत्पाद और फॉलो-अप एक साथ रखने के लिए एक नया {{item}} जोड़ें।",
     "call": "कॉल करें",
-    "whatsapp": "व्हाट्सएप"
+    "whatsapp": "व्हाट्सएप",
+    "breadcrumb": "बिक्री पाइपलाइन",
+    "subtitle": "हर {{item}} को आगे बढ़ाते रहें।",
+    "follow_ups": "{{count}} फॉलो-अप पर ध्यान देने की आवश्यकता है",
+    "follow_ups_sub": "अगली बातचीत को संभाल कर रखें।",
+    "add_customer": "नया ग्राहक जोड़ें",
+    "edit_customer": "ग्राहक संपादित करें",
+    "products_required": "आवश्यक उत्पाद",
+    "placeholder": {
+      "name": "उदा. राहुल शर्मा",
+      "phone": "उदा. +91 98765 43210",
+      "location": "उदा. मुंबई"
+    },
+    "status": {
+      "all": "सभी",
+      "planning": "प्लानिंग",
+      "visiting": "विजिटिंग",
+      "quoted": "कोटेड",
+      "purchased": "खरीदा गया"
+    }
   }
 }

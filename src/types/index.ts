@@ -53,3 +53,25 @@ export interface Customer {
     full_name: string | null;
   } | null;
 }
+
+export interface Quote {
+  id: string;
+  shop_id: string;
+  customer_id: string | null;
+  subtotal: number;
+  tax: number;
+  total_amount: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface QuoteItem {
+  id: string;
+  quote_id: string;
+  product_id: string | null;
+  quantity: number;
+  price_at_time: number;
+  created_at: string;
+}
+

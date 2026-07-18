@@ -1,20 +1,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #0D2D4D;
-  --color-primaryHover: #0A243D;
-  --color-accent: #C96C45;
-  --color-accentSoft: #F8E8E0;
-  --color-success: #177B63;
-  --color-warning: #B86D13;
-  --color-error: #C63C3C;
-  --color-background: #F7F5F0;
-  --color-surface: #FFFFFF;
-  --color-textPrimary: #17212B;
-  --color-textSecondary: #67727E;
-  --color-border: #E7E2DA;
-  --color-sand: #F1ECE3;
-  --color-stone: #D7CFC2;
+  --color-primary: var(--theme-primary);
+  --color-primaryHover: var(--theme-primaryHover);
+  --color-accent: var(--theme-accent);
+  --color-accentSoft: var(--theme-accentSoft);
+  --color-success: var(--theme-success);
+  --color-warning: var(--theme-warning);
+  --color-error: var(--theme-error);
+  --color-background: var(--theme-background);
+  --color-surface: var(--theme-surface);
+  --color-textPrimary: var(--theme-textPrimary);
+  --color-textSecondary: var(--theme-textSecondary);
+  --color-border: var(--theme-border);
+  --color-sand: var(--theme-sand);
+  --color-stone: var(--theme-stone);
+  --color-hero: var(--theme-hero);
+  --color-heroText: var(--theme-heroText);
+}
+
+:root {
+  --theme-primary: #0D2D4D;
+  --theme-primaryHover: #0A243D;
+  --theme-accent: #C96C45;
+  --theme-accentSoft: #F8E8E0;
+  --theme-success: #177B63;
+  --theme-warning: #B86D13;
+  --theme-error: #C63C3C;
+  --theme-background: #F7F5F0;
+  --theme-surface: #FFFFFF;
+  --theme-textPrimary: #17212B;
+  --theme-textSecondary: #67727E;
+  --theme-border: #E7E2DA;
+  --theme-sand: #F1ECE3;
+  --theme-stone: #D7CFC2;
+  --theme-hero: var(--theme-primary);
+  --theme-heroText: #FFFFFF;
 }
 
 * {

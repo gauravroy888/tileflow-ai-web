@@ -14,12 +14,12 @@ interface CustomerCardProps {
 }
 
 const statusStyle: Record<string, { label: string; chip: string; action: string }> = {
-  new: { label: 'New lead', chip: 'bg-[#E7EFF8] text-[#315B91]', action: 'New enquiry' },
-  follow_up: { label: 'Follow up', chip: 'bg-[#F8E8E0] text-[#9A482A]', action: 'Follow up today' },
-  converted: { label: 'Won', chip: 'bg-[#D9ECE4] text-[#177B63]', action: 'Converted' },
-  lost: { label: 'Lost', chip: 'bg-[#EFECE8] text-[#67727E]', action: 'Closed' },
-  quoted: { label: 'Quoted', chip: 'bg-[#F8ECD5] text-[#9C5A10]', action: 'Quote sent' },
-  won: { label: 'Won', chip: 'bg-[#D9ECE4] text-[#177B63]', action: 'Converted' },
+  new: { label: 'New lead', chip: 'bg-primary/10 text-primary', action: 'New enquiry' },
+  follow_up: { label: 'Follow up', chip: 'bg-accent/10 text-accent', action: 'Follow up today' },
+  converted: { label: 'Won', chip: 'bg-success/10 text-success', action: 'Converted' },
+  lost: { label: 'Lost', chip: 'bg-textSecondary/10 text-textSecondary', action: 'Closed' },
+  quoted: { label: 'Quoted', chip: 'bg-warning/10 text-warning', action: 'Quote sent' },
+  won: { label: 'Won', chip: 'bg-success/10 text-success', action: 'Converted' },
 };
 
 const formatRupee = (value: number | null) => value == null
@@ -70,7 +70,7 @@ export function CustomerCard({ customer, onEdit, shopProducts = [], shopName = '
           </div>
         </div>
 
-        <div className="mx-4 flex items-center justify-between rounded-xl bg-[#FCFBF9] px-3 py-2.5">
+        <div className="mx-4 flex items-center justify-between rounded-xl bg-background px-3 py-2.5">
           <div className="flex min-w-0 items-center gap-2">
             <Clock3 size={15} className="shrink-0 text-accent" />
             <span className="truncate text-xs font-bold text-textPrimary">{style.action}</span>
@@ -103,7 +103,7 @@ export function CustomerCard({ customer, onEdit, shopProducts = [], shopName = '
           <Button variant="secondary" className="h-11 flex-1 gap-2" disabled={!customer.phone} onClick={() => window.open(`tel:${customer.phone}`)}>
             <Phone size={16} /> Call
           </Button>
-          <Button variant="outline" className="h-11 flex-1 gap-2 border-[#97D5BE] text-success hover:bg-[#EDF8F4]" disabled={!customer.phone} onClick={() => setIsWhatsAppOpen(true)}>
+          <Button variant="outline" className="h-11 flex-1 gap-2 border-success/30 text-success hover:bg-success/10" disabled={!customer.phone} onClick={() => setIsWhatsAppOpen(true)}>
             <MessageCircle size={16} /> WhatsApp
           </Button>
         </div>

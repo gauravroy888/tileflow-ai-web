@@ -20,7 +20,8 @@ const MobileLayout = () => {
   const { shop, profile } = useRetailProfile();
 
   const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'hi' : 'en';
+    const current = i18n.resolvedLanguage || i18n.language;
+    const newLang = current.startsWith('en') ? 'hi' : 'en';
     i18n.changeLanguage(newLang);
   };
 
@@ -39,7 +40,7 @@ const MobileLayout = () => {
       <header className="sticky top-0 z-20 border-b border-border/80 bg-background/95 px-4 py-2.5 backdrop-blur sm:px-6">
         <div className="mx-auto flex max-w-screen-xl items-center justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-[0_8px_16px_rgba(13,45,77,0.16)]">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-background shadow-[0_8px_16px_rgba(13,45,77,0.16)]">
               <ProfileIcon size={19} />
             </div>
             <div className="min-w-0">
@@ -53,7 +54,7 @@ const MobileLayout = () => {
           <div className="flex items-center gap-1">
             <button onClick={toggleLanguage} className="flex h-10 items-center gap-1 rounded-xl px-2.5 text-xs font-extrabold text-textSecondary transition-colors hover:bg-sand hover:text-primary" aria-label="Change language">
               <Languages size={17} />
-              {i18n.language === 'en' ? 'HI' : 'EN'}
+              {(i18n.resolvedLanguage || i18n.language).startsWith('en') ? 'HI' : 'EN'}
             </button>
             <button className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-transparent text-textSecondary transition-colors hover:border-border hover:bg-surface hover:text-primary" aria-label="Notifications">
               <Bell size={18} />
