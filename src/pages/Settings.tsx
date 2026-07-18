@@ -7,18 +7,7 @@ import { retailProfiles } from '../config/retailProfiles';
 import type { ModuleId } from '../config/retailProfiles';
 import { Check, ArrowLeft, Info } from 'lucide-react';
 
-const ALL_MODULES: { id: ModuleId; label: string }[] = [
-  { id: 'variants', label: 'Product Variants' },
-  { id: 'serialized', label: 'Serialized Items' },
-  { id: 'batch_expiry', label: 'Batch / Expiry' },
-  { id: 'project_sales', label: 'Project Sales' },
-  { id: 'service', label: 'Services & Bookings' },
-  { id: 'delivery', label: 'Delivery' },
-  { id: 'installation', label: 'Installation' },
-  { id: 'warranty', label: 'Warranty Management' },
-  { id: 'wholesale', label: 'Wholesale' },
-  { id: 'multi_store', label: 'Multi-store' },
-];
+
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -54,11 +43,7 @@ const Settings = () => {
     }
   };
 
-  const toggleModule = (id: ModuleId) => {
-    setEnabledModules(prev => 
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
-    );
-  };
+
 
   const handleSave = async () => {
     if (!shop?.id || !isOwner) return;
@@ -136,36 +121,7 @@ const Settings = () => {
         </div>
       </section>
 
-      <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">
-        <div className="flex items-start gap-2">
-          <h3 className="text-lg font-bold">Operation Modules</h3>
-        </div>
-        <div className="flex items-start gap-2 text-sm text-textSecondary bg-sand p-3 rounded-lg">
-          <Info size={16} className="shrink-0 mt-0.5 text-primary" />
-          <p>Disabling a module hides its interface in the app, but it <strong>never deletes your existing data</strong>.</p>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-           {ALL_MODULES.map(m => {
-             const isEnabled = enabledModules.includes(m.id);
-             return (
-               <button
-                 key={m.id}
-                 onClick={() => toggleModule(m.id)}
-                 className={`flex flex-col items-start p-3 rounded-xl border text-left transition-colors ${isEnabled ? 'border-primary bg-primary/5' : 'border-border hover:bg-surface-hover'}`}
-               >
-                  <div className="flex w-full justify-between items-center mb-1">
-                     <span className={`text-xs font-bold ${isEnabled ? 'text-primary' : 'text-textSecondary'}`}>
-                        {isEnabled ? 'Enabled' : 'Optional'}
-                     </span>
-                     {isEnabled && <Check size={14} className="text-primary" />}
-                  </div>
-                  <span className="text-sm font-semibold text-textPrimary">{m.label}</span>
-               </button>
-             );
-           })}
-        </div>
-      </section>
+
 
       <div className="flex justify-end gap-3 pt-4">
         <Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
