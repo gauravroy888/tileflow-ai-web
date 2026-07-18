@@ -1,17 +1,57 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #2563EB;
-  --color-success: #16A34A;
-  --color-warning: #F59E0B;
-  --color-error: #DC2626;
-  --color-background: #F8FAFC;
+  --color-primary: #0D2D4D;
+  --color-primaryHover: #0A243D;
+  --color-accent: #C96C45;
+  --color-accentSoft: #F8E8E0;
+  --color-success: #177B63;
+  --color-warning: #B86D13;
+  --color-error: #C63C3C;
+  --color-background: #F7F5F0;
   --color-surface: #FFFFFF;
-  --color-textPrimary: #111827;
-  --color-textSecondary: #6B7280;
-  --color-border: #E5E7EB;
+  --color-textPrimary: #17212B;
+  --color-textSecondary: #67727E;
+  --color-border: #E7E2DA;
+  --color-sand: #F1ECE3;
+  --color-stone: #D7CFC2;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   @apply bg-background text-textPrimary antialiased;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+a,
+input,
+textarea,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #CFE1ED;
+  color: #0D2D4D;
+}
+
+.safe-bottom {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+/* Keeps the assistant composer directly above the fixed app navigation. */
+.assistant-workspace {
+  height: calc(100dvh - 137px - env(safe-area-inset-bottom));
+}
+
+.page-shell {
+  @apply px-4 pb-28 pt-5 sm:px-6;
+}
+
+.eyebrow {
+  @apply text-[11px] font-bold uppercase tracking-[0.16em] text-textSecondary;
 }

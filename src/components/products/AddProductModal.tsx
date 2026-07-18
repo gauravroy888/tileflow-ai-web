@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import Cropper from 'react-easy-crop';
 import 'react-easy-crop/react-easy-crop.css';
+import { useRetailProfile } from '../providers/RetailProfileProvider';
 
 import type { Product } from '../../types';
 
@@ -41,6 +42,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 }
 
 const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose, onProductAdded, shopId, productToEdit }) => {
+  const { productFieldSchema } = useRetailProfile();
   const [loading, setLoading] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -49,32 +51,23 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<{x: number, y: number, width: number, height: number} | null>(null);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Record<string, any>>({
     name: '',
     sku: '',
     brand: '',
     category: '',
     price: '',
-    finish: '',
-    size: '',
-    material: '',
-    color: '',
     stock_status: 'in_stock',
   });
 
   useEffect(() => {
     if (!isOpen) {
-      // Reset form when modal closes
       setFormData({
         name: '',
         sku: '',
         brand: '',
         category: '',
         price: '',
-        finish: '',
-        size: '',
-        material: '',
-        color: '',
         stock_status: 'in_stock',
       });
       setImageFile(null);
@@ -84,21 +77,23 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
       setZoom(1);
       setCroppedAreaPixels(null);
     } else if (productToEdit) {
-      setFormData({
+      const initialData: Record<string, any> = {
         name: productToEdit.name || '',
         sku: productToEdit.sku || '',
         brand: productToEdit.brand || '',
         category: productToEdit.category || '',
         price: productToEdit.price ? productToEdit.price.toString() : '',
-        finish: productToEdit.finish || '',
-        size: productToEdit.size || '',
-        material: productToEdit.material || '',
-        color: productToEdit.color || '',
         stock_status: productToEdit.stock_status || 'in_stock',
+      };
+      
+      productFieldSchema.forEach(field => {
+        initialData[field.key] = (productToEdit as any)[field.key] || (productToEdit.attributes && productToEdit.attributes[field.key]) || '';
       });
+      
+      setFormData(initialData);
       setImagePreview(productToEdit.image_url || null);
     }
-  }, [isOpen, productToEdit]);
+  }, [isOpen, productToEdit, productFieldSchema]);
 
   const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels);
@@ -123,7 +118,6 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, 1000, 1000);
         
-        // Draw the cropped area stretched to 1000x1000
         ctx.drawImage(
           img,
           cropPixels.x,
@@ -165,7 +159,6 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
   const handleConfirmCrop = async () => {
     setIsCropping(false);
     if (imageFile && croppedAreaPixels) {
-      // Create a preview of the cropped area for the UI
       try {
         const resized = await resizeImage(imageFile, croppedAreaPixels);
         setImagePreview(URL.createObjectURL(resized));
@@ -183,9 +176,7 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
     try {
       let imageUrl = productToEdit ? productToEdit.image_url : null;
 
-      // Upload image if provided
       if (imageFile && croppedAreaPixels) {
-        // Resize image to 1000x1000 before upload using the crop pixels
         const resizedFile = await resizeImage(imageFile, croppedAreaPixels);
         
         const fileExt = 'jpg';
@@ -205,20 +196,29 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
         imageUrl = publicUrl;
       }
 
-      const payload = {
+      const attributes: Record<string, any> = {};
+      const payload: Record<string, any> = {
           shop_id: shopId,
           name: formData.name,
           sku: formData.sku || null,
           brand: formData.brand || null,
           category: formData.category || null,
           price: parseFloat(formData.price) || 0,
-          finish: formData.finish || null,
-          size: formData.size || null,
-          material: formData.material || null,
-          color: formData.color || null,
           image_url: imageUrl,
           stock_status: formData.stock_status || 'in_stock'
       };
+
+      productFieldSchema.forEach(field => {
+        // Map native columns (like size, finish, material, color) to payload directly
+        const nativeColumns = ['finish', 'size', 'material', 'color'];
+        if (nativeColumns.includes(field.key)) {
+          payload[field.key] = formData[field.key] || null;
+        } else {
+          attributes[field.key] = formData[field.key] || null;
+        }
+      });
+      
+      payload.attributes = attributes;
 
       if (productToEdit) {
         const { error: updateError } = await supabase
@@ -316,10 +316,10 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
               {/* Basic Info */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-textSecondary">Name *</label>
-                <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Kohler Veil Toilet" />
+                <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Product Name" />
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-textSecondary">Price ($) *</label>
+                <label className="block text-sm font-medium text-textSecondary">Price (₹) *</label>
                 <input required type="number" step="0.01" name="price" value={formData.price} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
               </div>
               <div className="space-y-2">
@@ -333,37 +333,43 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-textSecondary">SKU</label>
-                <input type="text" name="sku" value={formData.sku} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. K-5401-0" />
+                <input type="text" name="sku" value={formData.sku} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. SKU-123" />
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-textSecondary">Brand</label>
-                <input type="text" name="brand" value={formData.brand} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Kohler" />
+                <input type="text" name="brand" value={formData.brand} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Brand Name" />
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-textSecondary">Category</label>
-                <select name="category" value={formData.category} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary">
-                  <option value="">Select Category</option>
-                  <option value="Toilets">Toilets</option>
-                  <option value="Sinks">Sinks</option>
-                  <option value="Faucets">Faucets</option>
-                  <option value="Showers">Showers</option>
-                  <option value="Bathtubs">Bathtubs</option>
-                  <option value="Tiles">Tiles</option>
-                  <option value="Accessories">Accessories</option>
-                </select>
+                <input type="text" name="category" value={formData.category} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Category Name" />
               </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-textSecondary">Color</label>
-                <input type="text" name="color" value={formData.color} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. White" />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-textSecondary">Finish</label>
-                <input type="text" name="finish" value={formData.finish} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Matte, Glossy" />
-              </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-textSecondary">Size</label>
-                <input type="text" name="size" value={formData.size} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. 12x24" />
-              </div>
+              
+              {/* Dynamic Profile Fields */}
+              {productFieldSchema.map((field) => (
+                <div className="space-y-2" key={field.key}>
+                  <label className="block text-sm font-medium text-textSecondary">{field.label}</label>
+                  {field.type === 'select' ? (
+                    <select 
+                      name={field.key} 
+                      value={(formData as any)[field.key] || ''} 
+                      onChange={handleChange} 
+                      className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                      <option value="">Select {field.label}</option>
+                      {field.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  ) : (
+                    <input 
+                      type={field.type === 'number' ? 'number' : 'text'} 
+                      name={field.key} 
+                      value={(formData as any)[field.key] || ''} 
+                      onChange={handleChange} 
+                      className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" 
+                      placeholder={`e.g. ${field.label}`} 
+                    />
+                  )}
+                </div>
+              ))}
             </div>
           </form>
         </div>

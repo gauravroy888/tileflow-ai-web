@@ -1,19 +1,28 @@
 import { useEffect, useState } from 'react';
-import { Search, Filter, UserPlus, X, Plus, Check, Minus } from 'lucide-react';
+import { Search, UserPlus, X, Plus, Check, Minus, UsersRound } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, Product } from '../types';
 import { CustomerCard } from '../components/ui/CustomerCard';
 import { Button } from '../components/ui/Button';
-import { useTranslation } from 'react-i18next';
+
+import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 
 const PROJECT_TYPES = ['Residential', 'Commercial', 'Office', 'Hotel', 'Retail', 'Other'];
 const VISIT_STATUSES = ['new', 'follow_up', 'converted', 'lost'];
+const STATUS_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'new', label: 'New' },
+  { id: 'follow_up', label: 'Follow-up' },
+  { id: 'converted', label: 'Won' },
+  { id: 'lost', label: 'Lost' },
+];
 
 const Customers = () => {
-  const { t } = useTranslation();
+  const { labels } = useRetailProfile();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeStatus, setActiveStatus] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
@@ -71,23 +80,29 @@ const Customers = () => {
 
   const generateCustomerDraft = async (customerData: any, customerId: string, shop: string, retailer: string) => {
     try {
-      const prompt = `Write a short, professional, and friendly WhatsApp follow-up message to a retail customer from the shop "${shop}". The message is from "${retailer}".
-Customer Name: ${customerData.name}
-Project Type: ${customerData.project_type || 'General Inquiry'}
-Required Products: ${customerData.required_products || 'Not specified'}
-
-Rules:
-- Keep it under 4 sentences.
-- Be conversational and polite.
-- Sign off with the retailer's name and shop name.`;
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return;
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('shop_id')
+        .eq('id', sessionData.session.user.id)
+        .single();
         
-      const { data, error } = await supabase.functions.invoke('gemini-proxy', {
-        body: { action: 'chat', prompt, history: [] }
+      if (!profile?.shop_id) return;
+
+      const { data, error } = await supabase.functions.invoke('ai-draft-message', {
+        body: { 
+          customerId, 
+          shopId: profile.shop_id, 
+          retailerName: retailer, 
+          customerData, 
+          shopName: shop 
+        }
       });
 
-      if (!error && data?.text) {
-        await supabase.from('customers').update({ ai_draft_message: data.text.trim() }).eq('id', customerId);
-        // Silently refresh customers list in the background to show the new draft if user opens it
+      if (!error && data?.success) {
+        // The edge function already updates the DB, we just need to refresh the UI
         fetchCustomers();
       }
     } catch (err) {
@@ -228,51 +243,58 @@ Rules:
     }
   };
 
-  const filteredCustomers = customers.filter(c =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (c.phone && c.phone.includes(searchQuery))
-  );
+  const filteredCustomers = customers.filter((customer) => {
+    const matchesSearch = customer.name.toLowerCase().includes(searchQuery.toLowerCase()) || Boolean(customer.phone?.includes(searchQuery));
+    return matchesSearch && (activeStatus === 'all' || customer.visit_status === activeStatus);
+  });
+
+  const followUpCount = customers.filter((customer) => customer.visit_status === 'follow_up').length;
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header & Actions */}
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="text-2xl font-bold text-textPrimary">{t('customers.title')}</h2>
-        <Button size="sm" className="gap-1" onClick={handleOpenModal}>
-          <UserPlus size={16} /> {t('customers.add_new')}
+    <div className="page-shell mx-auto max-w-screen-xl space-y-5">
+      <header className="flex items-end justify-between gap-3">
+        <div>
+          <p className="eyebrow">Sales pipeline</p>
+          <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">Customers</h2>
+          <p className="mt-1 text-sm text-textSecondary">Keep every {labels.customerVisitLabel || 'visit'} moving forward.</p>
+        </div>
+        <Button size="sm" className="shrink-0 gap-1.5" onClick={handleOpenModal}>
+          <UserPlus size={17} /> Add {labels.customerVisitLabel || 'lead'}
         </Button>
+      </header>
+
+      <div className="rounded-2xl border border-[#F1D9CD] bg-accentSoft px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface text-accent shadow-sm"><UsersRound size={19} /></div>
+          <div className="min-w-0 flex-1"><p className="text-sm font-extrabold text-textPrimary">{followUpCount} follow-ups need attention</p><p className="mt-0.5 text-xs text-[#9A482A]">Keep the next conversation close to hand.</p></div>
+        </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input
-            type="text"
-            placeholder={t('customers.search')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-lg border border-border bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-primary min-h-[48px]"
-          />
-        </div>
-        <Button variant="outline" size="icon" aria-label="Filters">
-          <Filter size={20} />
-        </Button>
+      <label className="relative block">
+        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-textSecondary" size={19} />
+        <input type="search" placeholder="Search customers..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} className="h-12 w-full rounded-xl border border-border bg-surface pl-11 pr-4 text-sm shadow-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/15" />
+      </label>
+
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6">
+        {STATUS_FILTERS.map((filter) => <button key={filter.id} onClick={() => setActiveStatus(filter.id)} className={`shrink-0 rounded-full border px-3.5 py-2 text-xs font-extrabold transition-colors ${activeStatus === filter.id ? 'border-primary bg-primary text-white' : 'border-border bg-surface text-textSecondary hover:border-primary/30 hover:text-primary'}`}>{filter.label}</button>)}
       </div>
 
       {/* Customers List */}
       {loading ? (
-        <div className="space-y-3 mt-4">
+        <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="animate-pulse bg-surface rounded-xl h-32 border border-border" />
           ))}
         </div>
       ) : filteredCustomers.length === 0 ? (
-        <div className="text-center py-10">
-          <p className="text-textSecondary">{t('customers.no_customers')}</p>
+        <div className="rounded-2xl border border-dashed border-stone bg-surface px-6 py-14 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-primary"><UsersRound size={22} /></div>
+          <p className="mt-4 font-extrabold text-textPrimary">No customers found</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm leading-5 text-textSecondary">Add a new {labels.customerVisitLabel.toLowerCase() || 'lead'} to keep their requirements, products and follow-ups together.</p>
+          <Button className="mt-5 gap-2" onClick={handleOpenModal}><UserPlus size={17} /> Add {labels.customerVisitLabel || 'lead'}</Button>
         </div>
       ) : (
-        <div className="space-y-3 mt-4">
+        <div className="space-y-3">
           {filteredCustomers.map((customer) => (
             <CustomerCard key={customer.id} customer={customer} onEdit={() => handleEditCustomer(customer)} shopProducts={shopProducts} shopName={shopName} retailerName={retailerName} />
           ))}
@@ -491,4 +513,3 @@ Rules:
 };
 
 export default Customers;
-

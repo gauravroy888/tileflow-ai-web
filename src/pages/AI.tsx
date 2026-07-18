@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Camera, Image as ImageIcon, MessageSquare, Send, Sparkles, Paintbrush, Box, Plus, X, Check } from 'lucide-react';
+import { ArrowRight, Box, Camera, Check, ClipboardList, Image as ImageIcon, MessageSquare, PackageSearch, Paintbrush, Plus, Send, Sparkles, TrendingUp, X } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import type { Product, Customer } from '../types';
@@ -10,6 +10,12 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
 }
+
+const chatSuggestions = [
+  { label: 'Showroom follow-ups', prompt: 'Which customers should I follow up with today?', icon: ClipboardList, tone: 'bg-[#EEF5FC] text-[#315B91]' },
+  { label: 'Check my stock', prompt: 'What products do I currently have in my catalogue?', icon: PackageSearch, tone: 'bg-[#F8F0E6] text-[#AD681C]' },
+  { label: 'Sales idea', prompt: 'Suggest a simple way to improve sales this week.', icon: TrendingUp, tone: 'bg-[#F2EBF9] text-[#7D3FB5]' },
+];
 
 const AI = () => {
   // Chat State
@@ -252,70 +258,56 @@ const AI = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-120px)] bg-background">
+    <div className="assistant-workspace flex min-h-0 flex-col bg-background">
       {/* Content */}
       <div className="flex-1 overflow-hidden relative">
         
         {!activeTool ? (
-          <div className="h-full overflow-y-auto p-4">
-            <h2 className="text-2xl font-bold text-textPrimary mb-6">AI Assistant</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {/* Chat Tool */}
-              <button onClick={() => setActiveTool('chat')} className="bg-surface aspect-square rounded-2xl border border-border flex flex-col items-center justify-center gap-3 hover:border-primary hover:shadow-md transition-all group">
-                <div className="p-4 bg-primary/10 text-primary rounded-full group-hover:bg-primary group-hover:text-white transition-colors">
-                  <MessageSquare size={32} />
+          <div className="h-full overflow-y-auto p-4 pb-8 sm:p-6">
+            <div className="mx-auto max-w-screen-xl">
+              <header className="mb-5 flex items-end justify-between gap-4">
+                <div>
+                  <p className="eyebrow">AI studio</p>
+                  <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">Create with your catalogue</h2>
+                  <p className="mt-1 text-sm text-textSecondary">Turn a showroom conversation into a clear next step.</p>
                 </div>
-                <div className="text-center px-4">
-                  <h3 className="font-bold text-base text-textPrimary">Retail Chat</h3>
-                  <p className="text-xs text-textSecondary mt-1">Ask questions about your business</p>
+                <div className="hidden h-10 w-10 items-center justify-center rounded-xl bg-accentSoft text-accent sm:flex"><Sparkles size={19} /></div>
+              </header>
+
+              <button onClick={() => setActiveTool('visualize')} className="group relative w-full overflow-hidden rounded-2xl bg-primary p-5 text-left text-white shadow-[0_16px_32px_rgba(13,45,77,0.18)] transition-transform hover:-translate-y-0.5">
+                <div className="absolute -right-9 -top-10 h-40 w-40 rounded-full border-[18px] border-white/10" />
+                <div className="absolute bottom-4 right-5 grid grid-cols-3 gap-1 opacity-35"><span className="h-6 w-6 rounded-md border border-white/50" /><span className="h-6 w-6 rounded-md border border-white/30" /><span className="h-6 w-6 rounded-md border border-white/40" /><span className="h-6 w-6 rounded-md border border-white/30" /><span className="h-6 w-6 rounded-md border border-white/50" /><span className="h-6 w-6 rounded-md border border-white/30" /></div>
+                <div className="relative flex max-w-md items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/12 text-[#F5C4AA]"><ImageIcon size={21} /></div>
+                  <div className="min-w-0 flex-1"><p className="text-sm font-extrabold">Visualise a customer’s space</p><p className="mt-1 text-sm leading-5 text-white/70">Start from a room idea and bring your own products into the concept.</p><span className="mt-4 inline-flex items-center gap-1.5 text-xs font-extrabold text-white">Create a design <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" /></span></div>
                 </div>
               </button>
 
-              {/* Visualize Tool */}
-              <button onClick={() => setActiveTool('visualize')} className="bg-surface aspect-square rounded-2xl border border-border flex flex-col items-center justify-center gap-3 hover:border-primary hover:shadow-md transition-all group">
-                <div className="p-4 bg-blue-50 text-blue-600 rounded-full group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  <ImageIcon size={32} />
-                </div>
-                <div className="text-center px-4">
-                  <h3 className="font-bold text-base text-textPrimary">Visualize</h3>
-                  <p className="text-xs text-textSecondary mt-1">Design a space from text</p>
-                </div>
-              </button>
-              
-              {/* Restyle Tool */}
-              <button onClick={() => setActiveTool('style')} className="bg-surface aspect-square rounded-2xl border border-border flex flex-col items-center justify-center gap-3 hover:border-primary hover:shadow-md transition-all group">
-                <div className="p-4 bg-purple-50 text-purple-600 rounded-full group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                  <Paintbrush size={32} />
-                </div>
-                <div className="text-center px-4">
-                  <h3 className="font-bold text-base text-textPrimary">Restyle</h3>
-                  <p className="text-xs text-textSecondary mt-1">Redesign a photo</p>
-                </div>
-              </button>
-              
-              {/* Place Object Tool */}
-              <button onClick={() => setActiveTool('object')} className="bg-surface aspect-square rounded-2xl border border-border flex flex-col items-center justify-center gap-3 hover:border-primary hover:shadow-md transition-all group">
-                <div className="p-4 bg-orange-50 text-orange-600 rounded-full group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                  <Box size={32} />
-                </div>
-                <div className="text-center px-4">
-                  <h3 className="font-bold text-base text-textPrimary">Place Object</h3>
-                  <p className="text-xs text-textSecondary mt-1">Add a product to a photo</p>
-                </div>
-              </button>
+              <div className="mt-5 flex items-center gap-2"><span className="h-px flex-1 bg-border" /><p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-textSecondary">Other ways to work</p><span className="h-px flex-1 bg-border" /></div>
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {[
+                  { type: 'chat' as const, icon: MessageSquare, title: 'Retail chat', description: 'Ask about customers or stock', color: 'bg-[#E7EFF8] text-[#315B91]' },
+                  { type: 'style' as const, icon: Paintbrush, title: 'Restyle a room', description: 'Refresh an uploaded photo', color: 'bg-[#F3EBFA] text-[#7D3FB5]' },
+                  { type: 'object' as const, icon: Box, title: 'Place a product', description: 'Try a tile in a space', color: 'bg-[#F8ECD5] text-[#B86D13]' },
+                ].map((tool) => {
+                  const Icon = tool.icon;
+                  return <button key={tool.type} onClick={() => setActiveTool(tool.type)} className="group min-h-40 rounded-2xl border border-border bg-surface p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"><div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tool.color}`}><Icon size={19} /></div><h3 className="mt-5 text-sm font-extrabold text-textPrimary">{tool.title}</h3><p className="mt-1 text-xs leading-5 text-textSecondary">{tool.description}</p><ArrowRight size={15} className="mt-3 text-textSecondary transition-transform group-hover:translate-x-1 group-hover:text-primary" /></button>;
+                })}
+              </div>
+              <p className="mt-5 rounded-xl border border-[#DDE7F4] bg-[#F4F8FC] px-3.5 py-3 text-xs leading-5 text-[#315B91]"><span className="font-extrabold">Tip:</span> Add product images from your catalogue for a concept that is closer to what you can actually sell.</p>
             </div>
           </div>
         ) : (
           <div className="flex flex-col h-full">
             {/* Unified Header */}
-            <div className="flex items-center gap-3 p-4 border-b border-border bg-surface shrink-0">
+            <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 shrink-0">
               <button 
                 onClick={() => { setActiveTool(null); setUploadedImage(null); setGeneratedText(null); setToolPrompt(''); }} 
-                className="text-textSecondary hover:text-textPrimary text-sm font-medium px-3 py-1 bg-gray-100 rounded-md transition-colors"
+                className="rounded-xl bg-sand px-3 py-2 text-xs font-extrabold text-textSecondary transition-colors hover:bg-primary hover:text-white"
               >
                 ← Back
               </button>
-              <h3 className="font-bold text-lg text-textPrimary capitalize">
+              <h3 className="text-base font-extrabold text-textPrimary">
                 {activeTool === 'chat' ? 'Retail Assistant' : activeTool === 'style' ? 'Analyze & Restyle' : activeTool === 'visualize' ? 'Visualize Space' : 'Place Object'}
               </h3>
             </div>
@@ -323,45 +315,72 @@ const AI = () => {
             {activeTool === 'chat' ? (
               // CHAT VIEW
               <div className="flex flex-col flex-1 min-h-0">
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                <div className="flex-1 overflow-y-auto bg-background p-4">
                   {messages.length === 0 && (
-                    <div className="h-full flex flex-col items-center justify-center text-textSecondary p-8 text-center">
-                      <Sparkles size={48} className="mb-4 text-primary opacity-30" />
-                      <p className="font-medium text-textPrimary">Powered by Gemini AI</p>
-                      <p className="text-sm mt-1">Ask me anything about your retail business!</p>
+                    <div className="mx-auto flex min-h-full max-w-xl flex-col justify-center py-3">
+                      <section className="relative overflow-hidden rounded-3xl bg-primary px-5 py-6 text-white shadow-[0_18px_35px_rgba(13,45,77,0.18)]">
+                        <div className="absolute -right-7 -top-8 h-28 w-28 rounded-full border-[14px] border-white/10" />
+                        <div className="absolute bottom-3 right-7 text-white/10"><Sparkles size={62} strokeWidth={1.3} /></div>
+                        <div className="relative">
+                          <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-white/12 text-[#F5C4AA]"><Sparkles size={20} /></div>
+                          <p className="text-lg font-extrabold tracking-tight">Your showroom co-pilot</p>
+                          <p className="mt-1 max-w-sm text-sm leading-5 text-white/75">Ask about customers, products, or the next best move for your business.</p>
+                          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-bold text-white/85"><span className="h-1.5 w-1.5 rounded-full bg-[#9BE4C7]" /> Ready with your store context</div>
+                        </div>
+                      </section>
+
+                      <div className="mt-6 flex items-center gap-2"><span className="h-px flex-1 bg-border" /><p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-textSecondary">Try a quick question</p><span className="h-px flex-1 bg-border" /></div>
+                      <div className="mt-3 grid gap-2.5">
+                        {chatSuggestions.map((suggestion) => {
+                          const Icon = suggestion.icon;
+                          return (
+                            <button key={suggestion.label} onClick={() => setInput(suggestion.prompt)} className="group flex items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+                              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${suggestion.tone}`}><Icon size={17} /></span>
+                              <span className="min-w-0 flex-1"><span className="block text-sm font-extrabold text-textPrimary">{suggestion.label}</span><span className="mt-0.5 block truncate text-xs text-textSecondary">{suggestion.prompt}</span></span>
+                              <ArrowRight size={16} className="shrink-0 text-textSecondary transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-4 px-1 text-center text-xs leading-5 text-textSecondary">I use your saved catalogue and customer information to give more useful answers.</p>
                     </div>
                   )}
-                  {messages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[80%] p-3 rounded-2xl ${
-                        msg.role === 'user' 
-                          ? 'bg-primary text-white rounded-br-none' 
-                          : 'bg-surface border border-border text-textPrimary rounded-bl-none'
-                      }`}>
-                        {msg.content}
-                      </div>
+                  {messages.length > 0 && (
+                    <div className="mx-auto max-w-2xl space-y-4">
+                      <p className="rounded-xl border border-[#DDE7F4] bg-[#F4F8FC] px-3 py-2 text-center text-xs text-[#315B91]"><span className="font-extrabold">Retail context enabled.</span> Your catalogue and customer records inform this chat.</p>
+                      {messages.map((msg, i) => (
+                        <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                          {msg.role === 'assistant' && <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Sparkles size={15} /></span>}
+                          <div className={`max-w-[80%] px-3.5 py-3 text-sm leading-6 ${
+                            msg.role === 'user' 
+                              ? 'rounded-2xl rounded-br-md bg-primary text-white shadow-sm' 
+                              : 'rounded-2xl rounded-bl-md border border-border bg-surface text-textPrimary shadow-sm'
+                          }`}>
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                   {loadingChat && (
-                    <div className="flex justify-start">
-                      <div className="bg-surface border border-border text-textSecondary p-3 rounded-2xl rounded-bl-none animate-pulse">
-                        Thinking...
-                      </div>
+                    <div className="mx-auto mt-4 flex max-w-2xl justify-start gap-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-white"><Sparkles size={15} /></span>
+                      <div className="rounded-2xl rounded-bl-md border border-border bg-surface px-3.5 py-3 text-sm text-textSecondary shadow-sm"><span className="inline-flex gap-1"><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-textSecondary [animation-delay:-0.2s]" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-textSecondary [animation-delay:-0.1s]" /><i className="h-1.5 w-1.5 animate-bounce rounded-full bg-textSecondary" /></span></div>
                     </div>
                   )}
                 </div>
-                <div className="p-4 bg-surface border-t border-border shrink-0">
-                  <form onSubmit={handleSendMessage} className="flex gap-2">
+                <div className="border-t border-border bg-surface/95 p-3 backdrop-blur shrink-0">
+                  <form onSubmit={handleSendMessage} className="mx-auto flex max-w-2xl items-center gap-2 rounded-2xl border border-border bg-background p-1.5 shadow-sm transition-shadow focus-within:border-primary/35 focus-within:shadow-[0_0_0_3px_rgba(13,45,77,0.08)]">
                     <input
                       type="text"
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
-                      placeholder="Ask a question..."
-                      className="flex-1 border border-border rounded-full px-4 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Ask about your business..."
+                      className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-textPrimary outline-none placeholder:text-textSecondary"
                       disabled={loadingChat}
                     />
-                    <Button type="submit" size="icon" className="rounded-full shrink-0" disabled={loadingChat || !input.trim()}>
-                      <Send size={18} />
+                    <Button type="submit" size="icon" className="h-9 w-9 rounded-xl shrink-0" disabled={loadingChat || !input.trim()}>
+                      <Send size={16} />
                     </Button>
                   </form>
                 </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { useTranslation } from 'react-i18next';
+import { ArrowRight, Grid2X2, Sparkles } from 'lucide-react';
 
 const Login = () => {
   const { t } = useTranslation();
@@ -10,11 +11,13 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setSuccess(null);
     
     if (isSignUp) {
       const { error } = await supabase.auth.signUp({
@@ -22,7 +25,7 @@ const Login = () => {
         password,
       });
       if (error) setError(error.message);
-      else setError('Check your email for the confirmation link!');
+      else setSuccess('Check your email for the confirmation link.');
     } else {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -49,28 +52,32 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center px-6 py-12">
-      <div className="sm:mx-auto sm:w-full sm:max-w-sm">
-        <h2 className="mt-10 text-center text-3xl font-bold leading-9 tracking-tight text-primary">
-          {t('app_name')}
-        </h2>
-        <p className="mt-2 text-center text-sm text-textSecondary">
-          {t('login.title')}
-        </p>
+    <div className="relative flex min-h-screen flex-col justify-center overflow-hidden bg-background px-5 py-10 sm:px-6">
+      <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-[#E2ECF3] blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 -right-20 h-72 w-72 rounded-full bg-[#F3DFD4] blur-3xl" />
+      <div className="relative sm:mx-auto sm:w-full sm:max-w-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-white shadow-[0_14px_30px_rgba(13,45,77,0.2)]"><Grid2X2 size={25} /></div>
+        <div className="mt-5 text-center">
+          <p className="eyebrow">Showroom sales workspace</p>
+          <h2 className="mt-1 text-3xl font-extrabold tracking-tight text-primary">{t('app_name')}</h2>
+          <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-textSecondary">Organise customers, product samples and follow-ups in one calm workspace.</p>
+        </div>
       </div>
 
-      <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-sm bg-surface px-6 py-8 shadow-sm rounded-lg border border-border">
+      <div className="relative mt-8 sm:mx-auto sm:w-full sm:max-w-sm rounded-2xl border border-border bg-surface px-5 py-6 shadow-[0_18px_45px_rgba(23,33,43,0.08)] sm:px-6">
+        <div className="mb-6"><div className="flex items-center gap-2 text-primary"><Sparkles size={17} className="text-accent" /><span className="text-sm font-extrabold">Welcome back</span></div><p className="mt-1 text-xs leading-5 text-textSecondary">Sign in to continue running your showroom.</p></div>
         {error && (
-          <div className="bg-red-50 text-error p-3 rounded-md text-sm border border-red-200 mb-6">
+          <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-error">
             {error}
           </div>
         )}
+        {success && <div className="mb-5 rounded-xl border border-[#B9DFCF] bg-[#EDF8F4] p-3 text-sm text-success">{success}</div>}
 
         <div>
           <Button 
             type="button" 
             variant="outline" 
-            className="w-full gap-2 flex items-center justify-center bg-white hover:bg-gray-50 border-gray-300 text-gray-700 py-3"
+            className="flex w-full items-center justify-center gap-2 border-border bg-surface py-3 text-textPrimary hover:bg-sand"
             onClick={handleGoogleLogin}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -89,7 +96,7 @@ const Login = () => {
               <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-sm font-medium leading-6">
-              <span className="bg-surface px-6 text-textSecondary">Or continue with email</span>
+              <span className="bg-surface px-4 text-xs font-bold uppercase tracking-[0.12em] text-textSecondary">Or continue with email</span>
             </div>
           </div>
         </div>
@@ -111,7 +118,7 @@ const Login = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="block w-full rounded-md border-0 py-2.5 text-textPrimary shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6 px-3 min-h-[48px]"
+                className="block min-h-[48px] w-full rounded-xl border border-border bg-background px-3 py-2.5 text-textPrimary shadow-sm outline-none placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15 sm:text-sm"
               />
             </div>
           </div>
@@ -134,14 +141,14 @@ const Login = () => {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="block w-full rounded-md border-0 py-2.5 text-textPrimary shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6 px-3 min-h-[48px]"
+                className="block min-h-[48px] w-full rounded-xl border border-border bg-background px-3 py-2.5 text-textPrimary shadow-sm outline-none placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15 sm:text-sm"
               />
             </div>
           </div>
 
           <div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('login.signing_in') : (isSignUp ? t('login.create_account') : t('login.sign_in'))}
+            <Button type="submit" className="w-full gap-2" disabled={loading}>
+              {loading ? t('login.signing_in') : (isSignUp ? t('login.create_account') : <>{t('login.sign_in')} <ArrowRight size={17} /></>)}
             </Button>
           </div>
         </form>

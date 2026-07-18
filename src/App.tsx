@@ -10,54 +10,65 @@ import Products from './pages/Products';
 import Customers from './pages/Customers';
 import Onboarding from './pages/Onboarding';
 import AI from './pages/AI';
+import More from './pages/More';
+import QuoteBuilder from './pages/QuoteBuilder';
+import { RetailProfileProvider, useRetailProfile } from './components/providers/RetailProfileProvider';
+
+import Settings from './pages/Settings';
+
+function AuthenticatedRoutes() {
+  const { shop, loading, refreshProfile } = useRetailProfile();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-textSecondary">Loading Workspace...</p>
+      </div>
+    );
+  }
+
+  const onboardingCompleted = shop?.onboarding_completed || false;
+
+  return (
+    <Routes>
+      <Route path="/onboarding" element={<Onboarding onComplete={refreshProfile} />} />
+      
+      {/* Protected Routes */}
+      <Route path="/" element={
+        onboardingCompleted ? <MobileLayout /> : <Navigate to="/onboarding" replace />
+      }>
+        <Route index element={<Dashboard />} />
+        <Route path="customers" element={<Customers />} />
+        <Route path="products" element={<Products />} />
+        <Route path="ai" element={<AI />} />
+        <Route path="quotes/new" element={<QuoteBuilder />} />
+        <Route path="more" element={<More />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
+      
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
 
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) checkOnboarding(session.user.id);
-      else setLoading(false);
+      setLoading(false);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) checkOnboarding(session.user.id);
     });
 
     return () => subscription.unsubscribe();
   }, []);
-
-  const checkOnboarding = async (userId: string) => {
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('shop_id')
-        .eq('id', userId)
-        .single();
-      
-      if (profile?.shop_id) {
-        const { data: shop } = await supabase
-          .from('shops')
-          .select('onboarding_completed')
-          .eq('id', profile.shop_id)
-          .single();
-        
-        setOnboardingCompleted(shop?.onboarding_completed || false);
-      } else {
-        setOnboardingCompleted(false);
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -73,22 +84,9 @@ function App() {
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
-      <Routes>
-        <Route path="/onboarding" element={<Onboarding onComplete={() => setOnboardingCompleted(true)} />} />
-        
-        {/* Protected Routes */}
-        <Route path="/" element={
-          onboardingCompleted ? <MobileLayout /> : <Navigate to="/onboarding" replace />
-        }>
-          <Route index element={<Dashboard />} />
-          <Route path="customers" element={<Customers />} />
-          <Route path="products" element={<Products />} />
-          <Route path="ai" element={<AI />} />
-          <Route path="more" element={<div className="p-4">More Options Placeholder</div>} />
-        </Route>
-        
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <RetailProfileProvider userId={session.user.id}>
+        <AuthenticatedRoutes />
+      </RetailProfileProvider>
     </BrowserRouter>
   );
 }
