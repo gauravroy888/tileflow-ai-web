@@ -35,7 +35,9 @@ const AI = () => {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [loadingTool, setLoadingTool] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<string>('');
+  const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Inventory Attachment State
   const [, setShopId] = useState<string | null>(null);
@@ -403,15 +405,25 @@ const AI = () => {
                         </button>
                       </div>
                     ) : (
-                      <div 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center text-textSecondary hover:bg-sand/50 hover:border-primary cursor-pointer transition-colors"
-                      >
-                        <Camera size={32} className="mb-2 text-textSecondary/50" />
-                        <p className="text-sm font-medium">Tap to upload a photo</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div 
+                          onClick={() => fileInputRef.current?.click()}
+                          className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center text-textSecondary hover:bg-sand/50 hover:border-primary cursor-pointer transition-colors text-center"
+                        >
+                          <ImageIcon size={28} className="mb-2 text-textSecondary/50" />
+                          <p className="text-sm font-medium">Upload Photo</p>
+                        </div>
+                        <div 
+                          onClick={() => cameraInputRef.current?.click()}
+                          className="border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center justify-center text-textSecondary hover:bg-sand/50 hover:border-primary cursor-pointer transition-colors text-center"
+                        >
+                          <Camera size={28} className="mb-2 text-textSecondary/50" />
+                          <p className="text-sm font-medium">Take Photo</p>
+                        </div>
                       </div>
                     )}
                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" />
+                    <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} onChange={handleImageUpload} className="hidden" />
                   </div>
                 )}
 

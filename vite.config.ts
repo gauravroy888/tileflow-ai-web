@@ -5,4 +5,8 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ command }) => ({
   plugins: [react()],
   base: command === 'build' ? '/tileflow-ai-web/' : '/',
+  server: {
+    port: 5174,
+    strictPort: true,
+  },
 }))

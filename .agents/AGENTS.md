@@ -1,2 +1,2 @@
-
 - Do not push to GitHub unless explicitly requested by the user.
+- Always run the local development server strictly on port 5174 because this is the exact `localhost` URL registered in the Supabase OAuth Redirect settings. Do not let the server pick a random port.

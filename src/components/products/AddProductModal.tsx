@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { X, Loader2, Image as ImageIcon, Check } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { X, Loader2, Image as ImageIcon, Check, Camera, Upload, RefreshCw, ZoomIn } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import Cropper from 'react-easy-crop';
@@ -296,18 +296,27 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
                     </div>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer bg-bgSecondary hover:bg-bgSecondary/80 transition-colors overflow-hidden relative">
-                    {imagePreview ? (
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <ImageIcon className="w-8 h-8 mb-3 text-textSecondary" />
-                        <p className="mb-2 text-sm text-textSecondary"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                        <p className="text-xs text-textSecondary">PNG, JPG or WEBP (MAX. 5MB)</p>
-                      </div>
+                  <div className="flex flex-col gap-3">
+                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer bg-bgSecondary hover:bg-bgSecondary/80 transition-colors overflow-hidden relative">
+                      {imagePreview ? (
+                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                          <ImageIcon className="w-8 h-8 mb-3 text-textSecondary" />
+                          <p className="mb-2 text-sm text-textSecondary"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                          <p className="text-xs text-textSecondary">PNG, JPG or WEBP (MAX. 5MB)</p>
+                        </div>
+                      )}
+                      <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                    </label>
+                    {!imagePreview && (
+                      <label className="flex items-center justify-center gap-2 w-full p-3 rounded-xl border border-border bg-surface hover:bg-surfaceHover cursor-pointer text-sm font-medium text-textPrimary transition-colors">
+                        <Camera size={18} />
+                        Take Photo
+                        <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImageChange} />
+                      </label>
                     )}
-                    <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                  </label>
+                  </div>
                 )}
               </div>
             </div>
