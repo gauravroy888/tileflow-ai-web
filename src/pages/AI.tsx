@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowRight, Camera, Check, ClipboardList, PackageSearch, Plus, Send, Sparkles, TrendingUp, X } from 'lucide-react';
+import { ArrowRight, Camera, Check, ClipboardList, PackageSearch, Plus, Send, Sparkles, TrendingUp, X, Image as ImageIcon } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
@@ -35,7 +35,6 @@ const AI = () => {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [loadingTool, setLoadingTool] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<string>('');
-  const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 

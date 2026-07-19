@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { X, Loader2, Image as ImageIcon, Check, Camera, Upload, RefreshCw, ZoomIn } from 'lucide-react';
+import React, { useState, useCallback, useEffect } from 'react';
+import { X, Loader2, Image as ImageIcon, Check, Camera } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import Cropper from 'react-easy-crop';
