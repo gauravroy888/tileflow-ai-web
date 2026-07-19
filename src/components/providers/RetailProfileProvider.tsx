@@ -10,6 +10,7 @@ interface ShopConfig {
   enabled_modules: ModuleId[];
   branding: Record<string, any>;
   onboarding_completed: boolean;
+  settings?: Record<string, any>;
 }
 
 interface RetailProfileContextType {

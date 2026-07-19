@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Button } from '../ui/Button';
 import Cropper from 'react-easy-crop';
 import 'react-easy-crop/react-easy-crop.css';
+import { getCroppedImg } from '../../utils/cropImage';
 import { useRetailProfile } from '../providers/RetailProfileProvider';
 
 import type { Product } from '../../types';
@@ -44,8 +45,8 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose, onProductAdded, shopId, productToEdit }) => {
   const { productFieldSchema } = useRetailProfile();
   const [loading, setLoading] = useState(false);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [images, setImages] = useState<{file?: File, url: string}[]>([]);
+  const [tempImagePreview, setTempImagePreview] = useState<string | null>(null);
   const [isCropping, setIsCropping] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -70,8 +71,8 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
         price: '',
         stock_status: 'in_stock',
       });
-      setImageFile(null);
-      setImagePreview(null);
+      setImages([]);
+      setTempImagePreview(null);
       setIsCropping(false);
       setCrop({ x: 0, y: 0 });
       setZoom(1);
@@ -91,7 +92,12 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
       });
       
       setFormData(initialData);
-      setImagePreview(productToEdit.image_url || null);
+      
+      if (productToEdit.images && productToEdit.images.length > 0) {
+        setImages(productToEdit.images.map(url => ({ url })));
+      } else if (productToEdit.image_url) {
+        setImages([{ url: productToEdit.image_url }]);
+      }
     }
   }, [isOpen, productToEdit, productFieldSchema]);
 
@@ -101,71 +107,39 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
 
   if (!isOpen) return null;
 
-  const resizeImage = (file: File, cropPixels: {x: number, y: number, width: number, height: number}): Promise<File> => {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1000;
-        canvas.height = 1000;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Canvas context not available'));
-          return;
-        }
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, 1000, 1000);
-        
-        ctx.drawImage(
-          img,
-          cropPixels.x,
-          cropPixels.y,
-          cropPixels.width,
-          cropPixels.height,
-          0,
-          0,
-          1000,
-          1000
-        );
-        
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const resizedFile = new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() });
-            resolve(resizedFile);
-          } else {
-            reject(new Error('Canvas to Blob failed'));
-          }
-        }, 'image/jpeg', 0.9);
-      };
-      img.onerror = (error) => reject(error);
-    });
-  };
-
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (images.length >= 3) {
+      alert('You can only upload up to 3 images.');
+      return;
+    }
     const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setImagePreview(reader.result as string);
+        setTempImagePreview(reader.result as string);
         setIsCropping(true);
       };
       reader.readAsDataURL(file);
     }
+    // reset input
+    e.target.value = '';
   };
 
   const handleConfirmCrop = async () => {
     setIsCropping(false);
-    if (imageFile && croppedAreaPixels) {
+    if (tempImagePreview && croppedAreaPixels) {
       try {
-        const resized = await resizeImage(imageFile, croppedAreaPixels);
-        setImagePreview(URL.createObjectURL(resized));
+        const resized = await getCroppedImg(tempImagePreview, croppedAreaPixels, 1000);
+        setImages(prev => [...prev, { file: resized, url: URL.createObjectURL(resized) }]);
       } catch (e) {
         console.error("Error creating crop preview", e);
       }
     }
+    setTempImagePreview(null);
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -174,38 +148,43 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
     
     setLoading(true);
     try {
-      let imageUrl = productToEdit ? productToEdit.image_url : null;
+      const uploadedUrls: string[] = [];
+      for (const img of images) {
+        if (img.file) {
+          const fileExt = 'jpg';
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `${shopId}/${fileName}`;
 
-      if (imageFile && croppedAreaPixels) {
-        const resizedFile = await resizeImage(imageFile, croppedAreaPixels);
-        
-        const fileExt = 'jpg';
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${shopId}/${fileName}`;
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, img.file);
 
-        const { error: uploadError } = await supabase.storage
-          .from('product-images')
-          .upload(filePath, resizedFile);
+          if (uploadError) throw uploadError;
 
-        if (uploadError) throw uploadError;
+          const { data: { publicUrl } } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(filePath);
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(filePath);
-
-        imageUrl = publicUrl;
+          uploadedUrls.push(publicUrl);
+        } else {
+          uploadedUrls.push(img.url);
+        }
       }
+
+      const imageUrl = uploadedUrls.length > 0 ? uploadedUrls[0] : null;
 
       const attributes: Record<string, any> = {};
       const payload: Record<string, any> = {
-          shop_id: shopId,
-          name: formData.name,
-          sku: formData.sku || null,
-          brand: formData.brand || null,
-          category: formData.category || null,
-          price: parseFloat(formData.price) || 0,
-          image_url: imageUrl,
-          stock_status: formData.stock_status || 'in_stock'
+        name: formData.name,
+        shop_id: shopId,
+        brand: formData.brand || null,
+        sku: formData.sku || null,
+        category: formData.category || null,
+        price: parseFloat(formData.price) || 0,
+        stock_status: formData.stock_status || 'in_stock',
+        image_url: imageUrl,
+        images: uploadedUrls,
+        attributes
       };
 
       productFieldSchema.forEach(field => {
@@ -262,15 +241,14 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
         <div className="p-6 overflow-y-auto flex-1">
           <form id="addProductForm" onSubmit={handleSubmit} className="space-y-6">
             
-            {/* Image Upload */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-textSecondary">Product Image (Required)</label>
+              <label className="block text-sm font-medium text-textSecondary">Product Images (Max 3)</label>
               <div className="flex items-center justify-center w-full">
-                {isCropping && imagePreview ? (
+                {isCropping && tempImagePreview ? (
                   <div className="relative w-full h-[300px] bg-black rounded-xl overflow-hidden flex flex-col">
                     <div className="relative flex-1 w-full h-full">
                       <Cropper
-                        image={imagePreview}
+                        image={tempImagePreview}
                         crop={crop}
                         zoom={zoom}
                         aspect={1}
@@ -297,24 +275,32 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
-                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-border rounded-xl cursor-pointer bg-bgSecondary hover:bg-bgSecondary/80 transition-colors overflow-hidden relative">
-                      {imagePreview ? (
-                        <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                          <ImageIcon className="w-8 h-8 mb-3 text-textSecondary" />
-                          <p className="mb-2 text-sm text-textSecondary"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                          <p className="text-xs text-textSecondary">PNG, JPG or WEBP (MAX. 5MB)</p>
-                        </div>
-                      )}
-                      <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
-                    </label>
-                    {!imagePreview && (
-                      <label className="flex items-center justify-center gap-2 w-full p-3 rounded-xl border border-border bg-surface hover:bg-surfaceHover cursor-pointer text-sm font-medium text-textPrimary transition-colors">
-                        <Camera size={18} />
-                        Take Photo
-                        <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImageChange} />
-                      </label>
+                    {images.length > 0 && (
+                      <div className="grid grid-cols-3 gap-3">
+                        {images.map((img, idx) => (
+                          <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-border group">
+                            <img src={img.url} alt={`Preview ${idx + 1}`} className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {images.length < 3 && (
+                      <>
+                        <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-xl cursor-pointer bg-bgSecondary hover:bg-bgSecondary/80 transition-colors">
+                          <ImageIcon className="w-6 h-6 mb-2 text-textSecondary" />
+                          <p className="text-xs text-textSecondary font-medium">Click to upload ({3 - images.length} left)</p>
+                          <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                        </label>
+                        <label className="flex items-center justify-center gap-2 w-full p-3 rounded-xl border border-border bg-surface hover:bg-surfaceHover cursor-pointer text-sm font-medium text-textPrimary transition-colors">
+                          <Camera size={18} />
+                          Take Photo
+                          <input type="file" className="hidden" accept="image/*" capture="environment" onChange={handleImageChange} />
+                        </label>
+                      </>
                     )}
                   </div>
                 )}

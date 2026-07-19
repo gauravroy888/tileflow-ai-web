@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && copy dist\\index.html dist\\404.html",
     "lint": "oxlint",
     "preview": "vite preview",
     "predeploy": "npm run build",
@@ -15,12 +15,14 @@
     "@google/generative-ai": "^0.24.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
     "i18next": "^26.3.6",
     "openai": "^6.47.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-easy-crop": "^6.2.2",
     "react-i18next": "^17.0.10",
+    "react-markdown": "^10.1.0",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

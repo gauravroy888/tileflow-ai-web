@@ -408,7 +408,7 @@ export const retailProfiles: Record<string, RetailProfile> = {
     },
     productFieldSchema: [
       { key: 'size', label: 'Size', type: 'text' },
-      { key: 'finish', label: 'Finish', type: 'select', options: ['Matte', 'Glossy', 'Satin', 'Textured'] },
+      { key: 'finish', label: 'Finish', type: 'text' },
       { key: 'material', label: 'Material', type: 'text' },
     ],
     calculatorKey: 'area_wastage',
@@ -449,7 +449,7 @@ export const retailProfiles: Record<string, RetailProfile> = {
       metrics: { total: 'Open Quotes', active: 'Project Leads', pending: 'Recent Sales' }
     },
     productFieldSchema: [
-      { key: 'finish', label: 'Finish', type: 'select', options: ['Chrome', 'Matte Black', 'Brushed Nickel', 'Brass'] },
+      { key: 'finish', label: 'Finish', type: 'text' },
       { key: 'collection', label: 'Collection', type: 'text' },
     ],
     calculatorKey: 'generic',

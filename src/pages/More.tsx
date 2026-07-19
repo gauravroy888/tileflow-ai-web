@@ -32,9 +32,11 @@ const More = () => {
             <button 
               key={item.title} 
               onClick={() => {
-                if (item.id === 'settings') {
-                  navigate('/settings');
-                }
+                if (item.id === 'settings') navigate('/settings');
+                if (item.id === 'team') navigate('/settings/team');
+                if (item.id === 'language') navigate('/settings/language');
+                if (item.id === 'privacy') navigate('/settings/privacy');
+                if (item.id === 'help') navigate('/help');
               }}
               className={`flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-sand/60 ${index ? 'border-t border-border' : ''}`}
             >

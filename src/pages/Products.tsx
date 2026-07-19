@@ -6,6 +6,7 @@ import { ProductCard } from '../components/ui/ProductCard';
 import { Button } from '../components/ui/Button';
 import { useTranslation } from 'react-i18next';
 import { AddProductModal } from '../components/products/AddProductModal';
+import { ProductDetailsModal } from '../components/products/ProductDetailsModal';
 
 
 type ProductFilter = 'all' | 'low_stock' | string;
@@ -18,6 +19,7 @@ const Products = () => {
   const [activeFilter, setActiveFilter] = useState<ProductFilter>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [selectedProductForDetails, setSelectedProductForDetails] = useState<Product | null>(null);
   const [shopId, setShopId] = useState<string | null>(null);
 
   useEffect(() => { fetchProducts(); }, []);
@@ -104,10 +106,11 @@ const Products = () => {
           <Button className="mt-5 gap-2" onClick={() => { setProductToEdit(null); setIsAddModalOpen(true); }}><Plus size={18} /> {t('products.add_new')}</Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{filteredProducts.map((product) => <ProductCard key={product.id} product={product} onEdit={setProductToEdit} onDelete={handleDeleteProduct} />)}</div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{filteredProducts.map((product) => <ProductCard key={product.id} product={product} onClick={setSelectedProductForDetails} onEdit={setProductToEdit} onDelete={handleDeleteProduct} />)}</div>
       )}
 
       <AddProductModal isOpen={isAddModalOpen || Boolean(productToEdit)} onClose={() => { setIsAddModalOpen(false); setProductToEdit(null); }} onProductAdded={() => { fetchProducts(); setProductToEdit(null); }} shopId={shopId} productToEdit={productToEdit} />
+      <ProductDetailsModal isOpen={Boolean(selectedProductForDetails)} product={selectedProductForDetails} onClose={() => setSelectedProductForDetails(null)} />
     </div>
   );
 };

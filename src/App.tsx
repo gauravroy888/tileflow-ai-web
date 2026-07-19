@@ -15,6 +15,10 @@ import QuoteBuilder from './pages/QuoteBuilder';
 import { RetailProfileProvider, useRetailProfile } from './components/providers/RetailProfileProvider';
 
 import Settings from './pages/Settings';
+import TeamAccess from './pages/settings/TeamAccess';
+import Language from './pages/settings/Language';
+import Privacy from './pages/settings/Privacy';
+import HelpCentre from './pages/HelpCentre';
 
 function AuthenticatedRoutes() {
   const { shop, loading, refreshProfile } = useRetailProfile();
@@ -44,6 +48,10 @@ function AuthenticatedRoutes() {
         <Route path="quotes/new" element={<QuoteBuilder />} />
         <Route path="more" element={<More />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/team" element={<TeamAccess />} />
+        <Route path="settings/language" element={<Language />} />
+        <Route path="settings/privacy" element={<Privacy />} />
+        <Route path="help" element={<HelpCentre />} />
       </Route>
       
       <Route path="*" element={<Navigate to="/" replace />} />

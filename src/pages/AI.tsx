@@ -3,7 +3,9 @@ import { ArrowRight, Camera, Check, ClipboardList, PackageSearch, Plus, Send, Sp
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
-import type { Product, Customer } from '../types';
+import ReactMarkdown from 'react-markdown';
+import { Menu, MessageSquare, Plus as PlusIcon, Trash2, Clock } from 'lucide-react';
+import type { Product, Customer, ChatSession } from '../types';
 
 type ToolType = string | null;
 
@@ -25,6 +27,9 @@ const AI = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loadingChat, setLoadingChat] = useState(false);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   // Tools State
   const [activeTool, setActiveTool] = useState<ToolType>(null);
@@ -39,7 +44,7 @@ const AI = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Inventory Attachment State
-  const [, setShopId] = useState<string | null>(null);
+  const [shopId, setShopId] = useState<string | null>(null);
   const [shopProducts, setShopProducts] = useState<Product[]>([]);
   const [shopCustomers, setShopCustomers] = useState<Customer[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
@@ -73,10 +78,53 @@ const AI = () => {
           .order('created_at', { ascending: false });
           
         if (customers) setShopCustomers(customers as Customer[]);
+
+        fetchChatSessions(profile.shop_id);
       }
     };
     fetchShopAndProducts();
   }, []);
+
+  const fetchChatSessions = async (sId: string) => {
+    const { data } = await supabase
+      .from('chat_sessions')
+      .select('*')
+      .eq('shop_id', sId)
+      .order('updated_at', { ascending: false })
+      .limit(20);
+    if (data) setChatSessions(data as ChatSession[]);
+  };
+
+  const loadSession = async (session: ChatSession) => {
+    setCurrentSessionId(session.id);
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('session_id', session.id)
+      .order('created_at', { ascending: true });
+    if (data) {
+      setMessages(data.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })));
+    }
+    setIsHistoryOpen(false);
+  };
+
+  const deleteSession = async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    if (window.confirm('Delete this chat history?')) {
+      await supabase.from('chat_sessions').delete().eq('id', sessionId);
+      setChatSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (currentSessionId === sessionId) {
+        setCurrentSessionId(null);
+        setMessages([]);
+      }
+    }
+  };
+
+  const startNewChat = () => {
+    setCurrentSessionId(null);
+    setMessages([]);
+    setIsHistoryOpen(false);
+  };
 
   const getBase64FromUrl = async (url: string): Promise<string> => {
     const response = await fetch(url);
@@ -116,6 +164,29 @@ const AI = () => {
         promptToSend = contextStr + userMsg;
       }
 
+      let sessionId = currentSessionId;
+      if (!sessionId && shopId) {
+        const title = userMsg.length > 30 ? userMsg.substring(0, 30) + '...' : userMsg;
+        const { data: newSession } = await supabase.from('chat_sessions').insert({
+          shop_id: shopId,
+          title,
+        }).select().single();
+        
+        if (newSession) {
+          sessionId = newSession.id;
+          setCurrentSessionId(sessionId);
+          setChatSessions(prev => [newSession as ChatSession, ...prev]);
+        }
+      }
+
+      if (sessionId) {
+        await supabase.from('chat_messages').insert({
+          session_id: sessionId,
+          role: 'user',
+          content: userMsg,
+        });
+      }
+
       const { data, error } = await supabase.functions.invoke('gemini-proxy', {
         body: { 
           action: 'chat',
@@ -126,7 +197,18 @@ const AI = () => {
       });
 
       if (error) throw error;
-      setMessages(prev => [...prev, { role: 'assistant', content: data.text }]);
+      const reply = data.text;
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+
+      if (sessionId) {
+        await supabase.from('chat_messages').insert({
+          session_id: sessionId,
+          role: 'assistant',
+          content: reply,
+        });
+        await supabase.from('chat_sessions').update({ updated_at: new Date().toISOString() }).eq('id', sessionId);
+        if (shopId) fetchChatSessions(shopId);
+      }
     } catch (error: any) {
       console.error(error);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error: ' + (error.message || 'Please try again.') }]);
@@ -305,16 +387,26 @@ const AI = () => {
         ) : (
           <div className="flex flex-col h-full">
             {/* Unified Header */}
-            <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-3 shrink-0">
-              <button 
-                onClick={() => { setActiveTool(null); setUploadedImage(null); setGeneratedText(null); setToolPrompt(''); }} 
-                className="rounded-xl bg-sand px-3 py-2 text-xs font-extrabold text-textSecondary transition-colors hover:bg-primary hover:text-background"
-              >
-                ← Back
-              </button>
-              <h3 className="text-base font-extrabold text-textPrimary">
-                {profile.aiFeatures.find(f => f.id === activeTool)?.title || 'AI Tool'}
-              </h3>
+            <div className="flex items-center justify-between border-b border-border bg-surface px-4 py-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => { setActiveTool(null); setUploadedImage(null); setGeneratedText(null); setToolPrompt(''); }} 
+                  className="rounded-xl bg-sand px-3 py-2 text-xs font-extrabold text-textSecondary transition-colors hover:bg-primary hover:text-background"
+                >
+                  ← Back
+                </button>
+                <h3 className="text-base font-extrabold text-textPrimary">
+                  {profile.aiFeatures.find(f => f.id === activeTool)?.title || 'AI Tool'}
+                </h3>
+              </div>
+              {activeTool === 'chat' && (
+                <button 
+                  onClick={() => setIsHistoryOpen(true)}
+                  className="rounded-xl bg-surfaceHover px-3 py-2 text-xs font-bold text-textPrimary flex items-center gap-2 border border-border shadow-sm hover:border-primary/50 transition-colors"
+                >
+                  <Menu size={16} /> History
+                </button>
+              )}
             </div>
 
             {activeTool === 'chat' ? (
@@ -356,12 +448,29 @@ const AI = () => {
                       {messages.map((msg, i) => (
                         <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                           {msg.role === 'assistant' && <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-background"><Sparkles size={15} /></span>}
-                          <div className={`max-w-[80%] px-3.5 py-3 text-sm leading-6 ${
+                          <div className={`max-w-[80%] px-3.5 py-3 text-sm leading-6 overflow-hidden ${
                             msg.role === 'user' 
                               ? 'rounded-2xl rounded-br-md bg-primary text-background shadow-sm' 
                               : 'rounded-2xl rounded-bl-md border border-border bg-surface text-textPrimary shadow-sm'
                           }`}>
-                            {msg.content}
+                            {msg.role === 'assistant' ? (
+                              <ReactMarkdown
+                                components={{
+                                  h1: ({node, ...props}) => <h1 className="text-lg font-bold mb-2" {...props} />,
+                                  h2: ({node, ...props}) => <h2 className="text-md font-bold mt-4 mb-2" {...props} />,
+                                  h3: ({node, ...props}) => <h3 className="text-sm font-bold mt-3 mb-1" {...props} />,
+                                  p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                                  ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+                                  ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+                                  li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                                  strong: ({node, ...props}) => <strong className="font-semibold text-textPrimary" {...props} />,
+                                }}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
+                            ) : (
+                              msg.content
+                            )}
                           </div>
                         </div>
                       ))}
@@ -483,7 +592,22 @@ const AI = () => {
                 {generatedText && (
                   <div className="mt-4 p-5 bg-surface border border-border rounded-xl">
                     <h4 className="font-bold text-textPrimary mb-3 flex items-center gap-2"><Sparkles size={16} className="text-primary" /> AI Design Concept:</h4>
-                    <p className="text-textSecondary text-sm leading-relaxed whitespace-pre-wrap">{generatedText}</p>
+                    <div className="text-textSecondary text-sm leading-relaxed overflow-hidden">
+                      <ReactMarkdown
+                        components={{
+                          h1: ({node, ...props}) => <h1 className="text-lg font-bold mb-2 text-textPrimary" {...props} />,
+                          h2: ({node, ...props}) => <h2 className="text-md font-bold mt-4 mb-2 text-textPrimary" {...props} />,
+                          h3: ({node, ...props}) => <h3 className="text-sm font-bold mt-3 mb-1 text-textPrimary" {...props} />,
+                          p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+                          li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-semibold text-textPrimary" {...props} />,
+                        }}
+                      >
+                        {generatedText}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 )}
               </div>
@@ -547,6 +671,57 @@ const AI = () => {
           </div>
         </div>
       )}
+
+      {/* History Slide-out Sidebar */}
+      <div 
+        className={`fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isHistoryOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} 
+        onClick={() => setIsHistoryOpen(false)}
+      />
+      <div 
+        className={`fixed top-0 right-0 h-full w-full max-w-sm bg-surface shadow-2xl z-[201] flex flex-col transition-transform duration-300 transform ${isHistoryOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="text-lg font-bold text-textPrimary flex items-center gap-2"><Clock size={18} /> Chat History</h2>
+          <button onClick={() => setIsHistoryOpen(false)} className="p-2 hover:bg-sand rounded-xl"><X size={20} className="text-textSecondary" /></button>
+        </div>
+        <div className="p-4 border-b border-border">
+          <Button onClick={startNewChat} className="w-full flex items-center justify-center gap-2 py-3">
+            <PlusIcon size={18} /> New Chat
+          </Button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {chatSessions.length === 0 ? (
+            <p className="text-center text-sm text-textSecondary py-8">No previous chats found.</p>
+          ) : (
+            chatSessions.map((session) => (
+              <div 
+                key={session.id}
+                onClick={() => loadSession(session)}
+                className={`group flex items-center justify-between p-3 rounded-xl cursor-pointer border transition-colors ${
+                  currentSessionId === session.id 
+                    ? 'bg-primary/5 border-primary/30 text-primary' 
+                    : 'bg-background border-border hover:border-primary/50 text-textPrimary'
+                }`}
+              >
+                <div className="flex items-center gap-3 overflow-hidden">
+                  <MessageSquare size={16} className={currentSessionId === session.id ? 'text-primary' : 'text-textSecondary'} />
+                  <div className="truncate">
+                    <p className="text-sm font-semibold truncate">{session.title}</p>
+                    <p className="text-[10px] text-textSecondary">{new Date(session.created_at).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={(e) => deleteSession(e, session.id)}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 text-textSecondary hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                  aria-label="Delete chat"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
     </div>
   );

@@ -3,6 +3,7 @@ export interface Shop {
   name: string;
   shop_type?: string;
   onboarding_completed?: boolean;
+  settings?: Record<string, any>;
   created_at: string;
 }
 
@@ -31,6 +32,7 @@ export interface Product {
   stock_status: string;
   tags: string[] | null;
   image_url: string | null;
+  images?: string[];
   attributes: Record<string, any>;
   created_at: string;
 }
@@ -72,6 +74,32 @@ export interface QuoteItem {
   product_id: string | null;
   quantity: number;
   price_at_time: number;
+  created_at: string;
+}
+
+export interface ChatSession {
+  id: string;
+  shop_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string;
+}
+
+export interface AppNotification {
+  id: string;
+  shop_id: string;
+  title: string;
+  message: string;
+  type: 'feature' | 'alert' | 'follow_up' | 'info';
+  is_read: boolean;
   created_at: string;
 }
 

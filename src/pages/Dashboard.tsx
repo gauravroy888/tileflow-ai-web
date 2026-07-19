@@ -2,6 +2,7 @@ import { ArrowUpRight, BellRing, ChevronRight, ClipboardList, Clock3, FileText, 
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
+import { useDashboardStats } from '../hooks/useDashboardStats';
 
 const formatRupee = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -11,13 +12,9 @@ const formatRupee = (amount: number) => new Intl.NumberFormat('en-IN', {
 
 const Dashboard = () => {
   const { t } = useTranslation();
-  const { labels, profile } = useRetailProfile();
-
-  const followUps = [
-    { name: 'Priya Shah', project: '3BHK renovation', due: 'Today', initials: 'PS', tone: 'bg-accent/10 text-accent' },
-    { name: 'Rahul Kumar', project: 'New home flooring', due: 'Tomorrow', initials: 'RK', tone: 'bg-success/10 text-success' },
-    { name: 'Amit Mehta', project: 'Commercial project', due: '18 Jul', initials: 'AM', tone: 'bg-primary/10 text-primary' },
-  ];
+  const { labels, profile, shop } = useRetailProfile();
+  
+  const { stats, loading } = useDashboardStats(shop?.id);
 
   const aiTitle = profile.id === 'tiles' ? t('dashboard.ai_visualise') : 
                   profile.id === 'electronics' ? t('dashboard.ai_compare') :
@@ -65,22 +62,22 @@ const Dashboard = () => {
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><BellRing size={18} /></div>
-            <p className="mt-4 text-2xl font-extrabold">8</p>
+            <p className="mt-4 text-2xl font-extrabold">{loading ? <span className="inline-block h-7 w-12 animate-pulse rounded bg-border"></span> : stats.followUpsCount}</p>
             <p className="mt-0.5 text-xs font-semibold text-textSecondary">{t('dashboard.follow_ups')}</p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-success/10 text-success"><ClipboardList size={18} /></div>
-            <p className="mt-4 text-2xl font-extrabold">12</p>
+            <p className="mt-4 text-2xl font-extrabold">{loading ? <span className="inline-block h-7 w-12 animate-pulse rounded bg-border"></span> : stats.projectLeadsCount}</p>
             <p className="mt-0.5 text-xs font-semibold text-textSecondary"><span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-textSecondary">{labels.metrics.active}</span></p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent/10 text-accent"><FileText size={18} /></div>
-            <p className="mt-4 text-xl font-extrabold">{formatRupee(480000)}</p>
+            <p className="mt-4 text-xl font-extrabold">{loading ? <span className="inline-block h-7 w-20 animate-pulse rounded bg-border"></span> : formatRupee(stats.openQuotesTotal)}</p>
             <p className="mt-0.5 text-xs font-semibold text-textSecondary"><span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-textSecondary">{labels.metrics.total}</span></p>
           </div>
           <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-warning/10 text-warning"><PackageSearch size={18} /></div>
-            <p className="mt-4 text-2xl font-extrabold">6</p>
+            <p className="mt-4 text-2xl font-extrabold">{loading ? <span className="inline-block h-7 w-12 animate-pulse rounded bg-border"></span> : stats.recentSalesCount}</p>
             <p className="mt-0.5 text-xs font-semibold text-textSecondary"><span className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-textSecondary">{labels.metrics.pending}</span></p>
           </div>
         </div>
@@ -95,20 +92,36 @@ const Dashboard = () => {
           <Link to="/customers" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">{t('dashboard.view_all')} <ArrowUpRight size={14} /></Link>
         </div>
         <div className="divide-y divide-border">
-          {followUps.map((customer) => (
-            <Link key={customer.name} to="/customers" className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-sand/60 sm:px-5">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${customer.tone}`}>{customer.initials}</div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold">{customer.name}</p>
-                <p className="truncate text-xs text-textSecondary">{customer.project}</p>
+          {loading ? (
+            <div className="p-8 text-center text-textSecondary animate-pulse">Loading follow-ups...</div>
+          ) : stats.followUpList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-12 text-center">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success/10 text-success">
+                <ClipboardList size={28} />
               </div>
-              <div className="text-right">
-                <p className="text-xs font-bold text-accent">{customer.due}</p>
-                <p className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-textSecondary"><Clock3 size={12} /> {t('dashboard.follow_up_action')}</p>
-              </div>
-              <ChevronRight size={18} className="text-stone" />
-            </Link>
-          ))}
+              <p className="text-sm font-extrabold text-textPrimary">No follow-ups due</p>
+              <p className="mt-1 max-w-xs text-xs leading-relaxed text-textSecondary">You've caught up with all your leads. Great job!</p>
+            </div>
+          ) : (
+            stats.followUpList.map((customer, index) => {
+              const tone = index % 3 === 0 ? 'bg-accent/10 text-accent' : index % 3 === 1 ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary';
+              const initials = customer.name.substring(0, 2).toUpperCase();
+              return (
+                <Link key={customer.id} to="/customers" className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-sand/60 sm:px-5">
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-extrabold ${tone}`}>{initials}</div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-bold">{customer.name}</p>
+                    <p className="truncate text-xs text-textSecondary">{customer.project_type || 'General inquiry'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-bold text-accent">Pending</p>
+                    <p className="mt-0.5 flex items-center justify-end gap-1 text-[11px] text-textSecondary"><Clock3 size={12} /> {t('dashboard.follow_up_action')}</p>
+                  </div>
+                  <ChevronRight size={18} className="text-stone" />
+                </Link>
+              );
+            })
+          )}
         </div>
       </section>
 

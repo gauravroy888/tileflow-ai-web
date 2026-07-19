@@ -1,2 +1,4 @@
 - Do not push to GitHub unless explicitly requested by the user.
 - Always run the local development server strictly on port 5174 because this is the exact `localhost` URL registered in the Supabase OAuth Redirect settings. Do not let the server pick a random port.
+- Always run `npm run build` locally to verify TypeScript compilation and catch any unused variables or missing imports before declaring a feature complete or pushing to GitHub.
+- For Single Page Applications (SPAs) deployed to GitHub Pages, always ensure that the build step copies `index.html` to `404.html` (e.g., `cp dist/index.html dist/404.html`) so that client-side routing survives browser reloads and direct link navigations.
