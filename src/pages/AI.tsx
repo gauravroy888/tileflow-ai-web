@@ -259,7 +259,7 @@ const AI = () => {
       }
 
       if (selectedProducts.length > 0) {
-        prompt += `\n\nAdditionally, I have attached images of ${selectedProducts.length} product(s) from my inventory. Please creatively incorporate them into the design:\n`;
+        prompt += `\n\nCRITICAL: Incorporate these exact products into the space:\n`;
         selectedProducts.forEach((p, index) => {
           prompt += `${index + 1}. ${p.name} (Category: ${p.category || 'N/A'}, Color: ${p.color || 'N/A'}, Material: ${p.material || 'N/A'})\n`;
         });
@@ -279,36 +279,24 @@ const AI = () => {
         }
       }
 
-      prompt += `\n\nCRITICAL INSTRUCTION: At the very end of your response, you must write a highly descriptive, concise prompt for an image generation AI (like DALL-E 3) to generate a photorealistic image of this exact space incorporating the attached products. Enclose this prompt strictly within <dalle_prompt> and </dalle_prompt> tags.`;
-
       parts.push({ text: prompt });
       parts.push(...imageParts);
 
-      const { data: visionData, error: visionError } = await supabase.functions.invoke('gemini-proxy', {
-        body: {
-          action: 'vision',
-          parts: [{ text: prompt }],
-          imageParts: imageParts
-        }
-      });
-      if (visionError) throw visionError;
-      
-      const text = visionData.text;
-      
-      const dalleMatch = text.match(/<dalle_prompt>([\s\S]*?)<\/dalle_prompt>/i);
-      if (dalleMatch && dalleMatch[1]) {
-        const dallePrompt = dalleMatch[1].trim();
-        const cleanText = text.replace(/<dalle_prompt>[\s\S]*?<\/dalle_prompt>/gi, '').trim();
-        setGeneratedText(cleanText);
-        
-        setLoadingStatus('Generating image with Gemini Nano Banana...');
+      // If this is purely a chat/vision text task with no image output expected, just use Gemini
+      if (activeFeature.type !== 'vision_with_image' && activeFeature.type !== 'image_generation') {
+        const { data: visionData, error: visionError } = await supabase.functions.invoke('gemini-proxy', {
+          body: {
+            action: 'vision',
+            parts: [{ text: prompt }],
+            imageParts: imageParts
+          }
+        });
+        if (visionError) throw visionError;
+        setGeneratedText(visionData.text);
+      } else {
+        // This is an image generation/editing task. Go straight to the image proxy.
+        setLoadingStatus('Generating image with OpenAI...');
         try {
-          // Build request parts for Gemini image generation REST API
-          const restParts: any[] = [
-            { text: `You are an expert interior designer and photo editor. ${dallePrompt} Generate a single photorealistic image showing this exact result. Make it look like a real interior design photograph. IMPORTANT: Incorporate the specific product(s) shown in the attached images into the scene.` },
-            ...imageParts,
-          ];
-
           // Check Rate Limit by inserting log
           const { error: usageError } = await supabase.from('ai_usage_logs').insert({
             shop_id: shopId,
@@ -326,11 +314,13 @@ const AI = () => {
           const { data, error } = await supabase.functions.invoke('gemini-proxy', {
             body: {
               action: 'generateImage',
-              parts: restParts
+              parts: parts,
+              imageParts: imageParts // Pass the base image and product images directly to OpenAI
             }
           });
 
           if (error) throw error;
+          
           let imageGenerated = false;
           for (const candidate of data.candidates || []) {
             for (const part of (candidate.content?.parts || [])) {
@@ -338,6 +328,7 @@ const AI = () => {
                 const dataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
                 setGeneratedImageUrl(dataUrl);
                 imageGenerated = true;
+                setGeneratedText("Here is your newly designed space, incorporating your selected products!");
                 break;
               }
             }
@@ -345,14 +336,12 @@ const AI = () => {
           }
 
           if (!imageGenerated) {
-            throw new Error('Gemini returned no image. Response: ' + JSON.stringify(data).substring(0, 300));
+            throw new Error('OpenAI returned no image. Response: ' + JSON.stringify(data).substring(0, 300));
           }
         } catch (imgErr: any) {
-          console.error('Gemini Image Generation Error:', imgErr);
-          alert('Gemini Image Generation failed:\n\n' + (imgErr.message || 'Unknown error') + '\n\nCheck console for details.');
+          console.error('OpenAI Image Generation Error:', imgErr);
+          alert('Image Generation failed:\n\n' + (imgErr.message || 'Unknown error') + '\n\nCheck console for details.');
         }
-      } else {
-        setGeneratedText(text);
       }
     } catch (error: any) {
       console.error(error);
