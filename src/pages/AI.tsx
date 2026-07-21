@@ -324,7 +324,20 @@ const AI = () => {
             }
           });
 
-          if (error) throw error;
+          if (error) {
+            let msg = error.message;
+            if (error.context) {
+              try {
+                const errData = await error.context.json();
+                if (errData && errData.error) {
+                  msg = errData.error;
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+            throw new Error('Edge Function Error: ' + msg);
+          }
           
           let imageGenerated = false;
           for (const candidate of data.candidates || []) {
