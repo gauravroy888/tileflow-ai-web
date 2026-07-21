@@ -297,10 +297,15 @@ const AI = () => {
         // This is an image generation/editing task. Go straight to the image proxy.
         setLoadingStatus('Generating image with OpenAI...');
         try {
+          const { data: authData } = await supabase.auth.getSession();
+          const userId = authData?.session?.user?.id;
+          
+          if (!userId) throw new Error("Not authenticated");
+
           // Check Rate Limit by inserting log
           const { error: usageError } = await supabase.from('ai_usage_logs').insert({
             shop_id: shopId,
-            user_id: profile.id,
+            user_id: userId,
             action_type: 'image_generation'
           });
 
