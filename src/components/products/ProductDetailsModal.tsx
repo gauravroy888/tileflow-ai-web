@@ -119,6 +119,19 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ produc
                   </div>
                 );
               })}
+
+              {/* Dynamic Additional Attributes from CSV/Integrations */}
+              {product.attributes && Object.entries(product.attributes)
+                .filter(([key]) => !productFieldSchema.find(f => f.key === key))
+                .map(([key, value]) => {
+                  if (!value) return null;
+                  return (
+                    <div key={key} className="p-4 bg-surface rounded-xl border border-border">
+                      <p className="text-xs font-medium text-textSecondary uppercase tracking-wider mb-1">{key.replace(/_/g, ' ')}</p>
+                      <p className="font-semibold text-textPrimary">{String(value)}</p>
+                    </div>
+                  );
+              })}
             </div>
           </div>
         </div>

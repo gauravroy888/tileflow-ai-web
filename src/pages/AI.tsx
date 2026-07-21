@@ -180,11 +180,18 @@ const AI = () => {
       }
 
       if (sessionId) {
-        await supabase.from('chat_messages').insert({
+        const { error: insertError } = await supabase.from('chat_messages').insert({
           session_id: sessionId,
           role: 'user',
           content: userMsg,
         });
+        
+        if (insertError) {
+          if (insertError.message.includes('RATE_LIMIT_AI_CHAT')) {
+            throw new Error('Daily AI chat limit reached (100 messages/day). Please try again tomorrow.');
+          }
+          throw insertError;
+        }
       }
 
       const { data, error } = await supabase.functions.invoke('gemini-proxy', {
@@ -301,6 +308,20 @@ const AI = () => {
             { text: `You are an expert interior designer and photo editor. ${dallePrompt} Generate a single photorealistic image showing this exact result. Make it look like a real interior design photograph. IMPORTANT: Incorporate the specific product(s) shown in the attached images into the scene.` },
             ...imageParts,
           ];
+
+          // Check Rate Limit by inserting log
+          const { error: usageError } = await supabase.from('ai_usage_logs').insert({
+            shop_id: shopId,
+            user_id: profile.id,
+            action_type: 'image_generation'
+          });
+
+          if (usageError) {
+            if (usageError.message.includes('RATE_LIMIT_AI_IMAGE')) {
+              throw new Error('Daily AI image limit reached (50 images/day). Please try again tomorrow.');
+            }
+            throw usageError;
+          }
 
           const { data, error } = await supabase.functions.invoke('gemini-proxy', {
             body: {

@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { X, Loader2, Image as ImageIcon, Check, Camera } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { uploadToR2 } from '../../lib/r2Storage';
+import toast from 'react-hot-toast';
 import { Button } from '../ui/Button';
 import Cropper from 'react-easy-crop';
 import 'react-easy-crop/react-easy-crop.css';
@@ -90,6 +92,14 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
       productFieldSchema.forEach(field => {
         initialData[field.key] = (productToEdit as any)[field.key] || (productToEdit.attributes && productToEdit.attributes[field.key]) || '';
       });
+
+      if (productToEdit.attributes) {
+        Object.entries(productToEdit.attributes).forEach(([key, value]) => {
+          if (!productFieldSchema.find(f => f.key === key)) {
+            initialData[key] = value || '';
+          }
+        });
+      }
       
       setFormData(initialData);
       
@@ -101,6 +111,33 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
     }
   }, [isOpen, productToEdit, productFieldSchema]);
 
+  // Load draft on open
+  useEffect(() => {
+    if (isOpen && !productToEdit && shopId) {
+      const saved = localStorage.getItem(`retailflow_draft_product_${shopId}`);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed && Object.keys(parsed).length > 0) {
+            setFormData(prev => ({ ...prev, ...parsed }));
+          }
+        } catch (e) {
+          console.error("Failed to parse draft", e);
+        }
+      }
+    }
+  }, [isOpen, productToEdit, shopId]);
+
+  // Auto-save draft when formData changes
+  useEffect(() => {
+    if (isOpen && !productToEdit && shopId) {
+      const timeout = setTimeout(() => {
+        localStorage.setItem(`retailflow_draft_product_${shopId}`, JSON.stringify(formData));
+      }, 500);
+      return () => clearTimeout(timeout);
+    }
+  }, [formData, isOpen, productToEdit, shopId]);
+
   const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
@@ -109,7 +146,7 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (images.length >= 3) {
-      alert('You can only upload up to 3 images.');
+      toast.error('You can only upload up to 3 images.');
       return;
     }
     const file = e.target.files?.[0];
@@ -144,28 +181,17 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!shopId) return alert('Shop ID not found');
+    if (!shopId) { toast.error('Shop ID not found'); return; }
     
     setLoading(true);
     try {
       const uploadedUrls: string[] = [];
       for (const img of images) {
+        let uploadedUrl = '';
         if (img.file) {
-          const fileExt = 'jpg';
-          const fileName = `${Math.random()}.${fileExt}`;
-          const filePath = `${shopId}/${fileName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('product-images')
-            .upload(filePath, img.file);
-
-          if (uploadError) throw uploadError;
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('product-images')
-            .getPublicUrl(filePath);
-
-          uploadedUrls.push(publicUrl);
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+          uploadedUrl = await uploadToR2(img.file, fileName);
+          uploadedUrls.push(uploadedUrl);
         } else {
           uploadedUrls.push(img.url);
         }
@@ -196,6 +222,16 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
           attributes[field.key] = formData[field.key] || null;
         }
       });
+
+      // Capture any dynamic extra attributes
+      Object.keys(formData).forEach(key => {
+        if (
+          !['name', 'price', 'stock_status', 'sku', 'brand', 'category'].includes(key) &&
+          !productFieldSchema.find(f => f.key === key)
+        ) {
+          attributes[key] = formData[key] || null;
+        }
+      });
       
       payload.attributes = attributes;
 
@@ -210,13 +246,22 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
           .from('products')
           .insert([payload]);
         if (insertError) throw insertError;
+        
+        // Clear draft on successful insert
+        localStorage.removeItem(`retailflow_draft_product_${shopId}`);
       }
 
       onProductAdded();
       onClose();
     } catch (error: any) {
       console.error('Error adding product:', error);
-      alert('Failed to add product: ' + error.message);
+      if (error.message?.includes('RATE_LIMIT_PRODUCTS_HOURLY')) {
+        toast.error('Rate limit exceeded: You can only add 100 products per hour. Please try again later.');
+      } else if (error.message?.includes('RATE_LIMIT_PRODUCTS_TOTAL')) {
+        toast.error('Plan limit reached: Your workspace has hit the maximum limit of 5000 active products.');
+      } else {
+        toast.error('Failed to add product: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -365,6 +410,25 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
                   )}
                 </div>
               ))}
+
+              {/* Dynamic Additional Attributes from CSV/Integrations */}
+              {Object.keys(formData)
+                .filter(key => 
+                  !['name', 'price', 'stock_status', 'sku', 'brand', 'category'].includes(key) && 
+                  !productFieldSchema.find(f => f.key === key)
+                )
+                .map(key => (
+                  <div className="space-y-2" key={key}>
+                    <label className="block text-sm font-medium text-textSecondary capitalize">{key.replace(/_/g, ' ')}</label>
+                    <input 
+                      type="text" 
+                      name={key} 
+                      value={(formData as any)[key] || ''} 
+                      onChange={handleChange} 
+                      className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" 
+                    />
+                  </div>
+                ))}
             </div>
           </form>
         </div>

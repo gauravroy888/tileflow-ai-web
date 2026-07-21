@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import { useDashboardStats } from '../hooks/useDashboardStats';
+import { useDashboardCharts } from '../hooks/useDashboardCharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, Cell } from 'recharts';
 
 const formatRupee = (amount: number) => new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -15,6 +17,9 @@ const Dashboard = () => {
   const { labels, profile, shop } = useRetailProfile();
   
   const { stats, loading } = useDashboardStats(shop?.id);
+  const { data: charts, isLoading: loadingCharts } = useDashboardCharts(shop?.id);
+  
+  const COLORS = ['#1D2E40', '#9A482A', '#D9895B', '#4CAF50', '#8599A6'];
 
   const aiTitle = profile.id === 'tiles' ? t('dashboard.ai_visualise') : 
                   profile.id === 'electronics' ? t('dashboard.ai_compare') :
@@ -83,6 +88,81 @@ const Dashboard = () => {
         </div>
       </section>
 
+      {/* Visual Analytics Section */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        {/* Trend Chart */}
+        <div className="rounded-2xl border border-border bg-surface shadow-sm">
+          <div className="border-b border-border px-4 py-4 sm:px-5">
+            <h3 className="text-lg font-extrabold">{t('dashboard.quotes_vs_sales') || 'Quotes vs. Sales (Last 30 Days)'}</h3>
+          </div>
+          <div className="p-4 h-[300px]">
+            {loadingCharts ? (
+              <div className="flex h-full items-center justify-center animate-pulse text-textSecondary">Loading chart...</div>
+            ) : charts && charts.trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={charts.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorQuotes" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#1D2E40" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#1D2E40" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#9A482A" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#9A482A" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="date" tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                  <YAxis tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Legend iconType="circle" />
+                  <Area type="monotone" dataKey="quotes" name="Quotes" stroke="#1D2E40" strokeWidth={3} fillOpacity={1} fill="url(#colorQuotes)" />
+                  <Area type="monotone" dataKey="sales" name="Sales" stroke="#9A482A" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-textSecondary">No data available</div>
+            )}
+          </div>
+        </div>
+
+        {/* Top Products */}
+        <div className="rounded-2xl border border-border bg-surface shadow-sm">
+          <div className="border-b border-border px-4 py-4 sm:px-5">
+            <h3 className="text-lg font-extrabold">{t('dashboard.top_products') || 'Top 5 Selling Products'}</h3>
+          </div>
+          <div className="p-4 h-[300px]">
+            {loadingCharts ? (
+              <div className="flex h-full items-center justify-center animate-pulse text-textSecondary">Loading chart...</div>
+            ) : charts && charts.topProductsData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={charts.topProductsData} layout="vertical" margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
+                  <XAxis type="number" tick={{fontSize: 12}} tickLine={false} axisLine={false} />
+                  <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 11}} tickLine={false} axisLine={false} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    cursor={{fill: '#f4f5f7'}}
+                  />
+                  <Bar dataKey="value" name="Units Sold" radius={[0, 4, 4, 0]} barSize={24}>
+                    {charts.topProductsData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex flex-col h-full items-center justify-center text-sm text-textSecondary text-center">
+                <PackageSearch size={32} className="mb-2 opacity-50" />
+                <p>No sales data yet.<br/>Convert some quotes to see top products!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="rounded-2xl border border-border bg-surface shadow-sm">
         <div className="flex items-center justify-between border-b border-border px-4 py-4 sm:px-5">
           <div>
@@ -103,7 +183,7 @@ const Dashboard = () => {
               <p className="mt-1 max-w-xs text-xs leading-relaxed text-textSecondary">You've caught up with all your leads. Great job!</p>
             </div>
           ) : (
-            stats.followUpList.map((customer, index) => {
+            stats.followUpList.map((customer: any, index: number) => {
               const tone = index % 3 === 0 ? 'bg-accent/10 text-accent' : index % 3 === 1 ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary';
               const initials = customer.name.substring(0, 2).toUpperCase();
               return (

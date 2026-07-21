@@ -11,6 +11,8 @@ interface ShopConfig {
   branding: Record<string, any>;
   onboarding_completed: boolean;
   settings?: Record<string, any>;
+  google_refresh_token?: string | null;
+  connected_spreadsheet_id?: string | null;
 }
 
 interface RetailProfileContextType {
@@ -22,6 +24,7 @@ interface RetailProfileContextType {
   productFieldSchema: RetailProfile['productFieldSchema'];
   calculatorKey: RetailProfile['calculatorKey'];
   aiProfileKey: RetailProfile['aiProfileKey'];
+  userProfile: { role: string; has_full_access: boolean } | null;
   loading: boolean;
   error: string | null;
   refreshProfile: () => Promise<void>;
@@ -34,6 +37,8 @@ export const RetailProfileProvider: React.FC<{ children: React.ReactNode, userId
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [userProfileData, setUserProfileData] = useState<{ role: string; has_full_access: boolean } | null>(null);
+
   const fetchProfile = async () => {
     setLoading(true);
     setError(null);
@@ -41,12 +46,14 @@ export const RetailProfileProvider: React.FC<{ children: React.ReactNode, userId
       // 1. Get user's profile to find their shop_id
       const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('shop_id')
+        .select('shop_id, role, has_full_access')
         .eq('id', userId)
         .single();
 
       if (profileError) throw profileError;
       if (!userProfile?.shop_id) throw new Error('No shop associated with user');
+      
+      setUserProfileData({ role: userProfile.role, has_full_access: userProfile.has_full_access });
 
       // 2. Fetch shop configuration
       const { data: shopData, error: shopError } = await supabase
@@ -130,6 +137,7 @@ export const RetailProfileProvider: React.FC<{ children: React.ReactNode, userId
     productFieldSchema: profile.productFieldSchema,
     calculatorKey: profile.calculatorKey,
     aiProfileKey: profile.aiProfileKey,
+    userProfile: userProfileData,
     loading,
     error,
     refreshProfile: fetchProfile,

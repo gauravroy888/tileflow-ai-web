@@ -13,12 +13,14 @@ import AI from './pages/AI';
 import More from './pages/More';
 import QuoteBuilder from './pages/QuoteBuilder';
 import { RetailProfileProvider, useRetailProfile } from './components/providers/RetailProfileProvider';
+import { useOfflineStatus } from './hooks/useOfflineStatus';
 
 import Settings from './pages/Settings';
 import TeamAccess from './pages/settings/TeamAccess';
 import Language from './pages/settings/Language';
 import Privacy from './pages/settings/Privacy';
 import HelpCentre from './pages/HelpCentre';
+import AcceptInvite from './pages/AcceptInvite';
 
 function AuthenticatedRoutes() {
   const { shop, loading, refreshProfile } = useRetailProfile();
@@ -62,6 +64,7 @@ function AuthenticatedRoutes() {
 function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const isOffline = useOfflineStatus();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -86,12 +89,30 @@ function App() {
     );
   }
 
+  // Always allow the accept-invite route — the user arrives from a magic link
+  // and may or may not have an active session yet when the page first loads.
+  if (typeof window !== 'undefined' && window.location.pathname.includes('/accept-invite')) {
+    return (
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <Routes>
+          <Route path="/accept-invite" element={<AcceptInvite />} />
+          <Route path="*" element={<AcceptInvite />} />
+        </Routes>
+      </BrowserRouter>
+    );
+  }
+
   if (!session) {
     return <Login />;
   }
 
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
+      {isOffline && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-red-500 text-white text-center text-xs font-bold py-1.5 shadow-md flex justify-center items-center gap-2">
+          <span>You are currently offline. Some features may be unavailable.</span>
+        </div>
+      )}
       <RetailProfileProvider userId={session.user.id}>
         <AuthenticatedRoutes />
       </RetailProfileProvider>

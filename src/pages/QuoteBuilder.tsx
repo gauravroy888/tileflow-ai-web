@@ -1,4 +1,5 @@
-import { ArrowLeft, Check, EllipsisVertical, Info, Minus, PackagePlus, Plus, Search, Send, Trash2, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Info, Minus, PackagePlus, Plus, Search, Send, Trash2, X, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/Button';
@@ -7,6 +8,8 @@ import { calculators } from '../lib/calculators';
 import type { CalculatorConfig } from '../lib/calculators';
 import { supabase } from '../lib/supabase';
 import type { Customer, Product } from '../types';
+import { generateQuotePDF } from '../lib/pdfGenerator';
+import { uploadToR2 } from '../lib/r2Storage';
 
 type QuoteItem = Product & {
   quantity: number;
@@ -20,7 +23,7 @@ const formatRupee = (amount: number) => new Intl.NumberFormat('en-IN', {
 
 const QuoteBuilder = () => {
   const navigate = useNavigate();
-  const { calculatorKey } = useRetailProfile();
+  const { shop, calculatorKey } = useRetailProfile();
   
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -32,9 +35,9 @@ const QuoteBuilder = () => {
   const [waste, setWaste] = useState(10);
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
-  const [isShareReady, setIsShareReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,8 +49,8 @@ const QuoteBuilder = () => {
         if (!profile) return;
         
         const [productsRes, customersRes] = await Promise.all([
-          supabase.from('products').select('*').eq('shop_id', profile.shop_id),
-          supabase.from('customers').select('*').eq('shop_id', profile.shop_id).order('created_at', { ascending: false })
+          supabase.from('products').select('*').eq('shop_id', profile.shop_id).eq('is_archived', false).limit(1000),
+          supabase.from('customers').select('*').eq('shop_id', profile.shop_id).eq('is_archived', false).order('created_at', { ascending: false }).limit(1000)
         ]);
         
         if (productsRes.data) setProducts(productsRes.data);
@@ -83,8 +86,8 @@ const QuoteBuilder = () => {
   };
   
   const shareQuote = async () => {
-    if (!customer) return alert('Please select a customer');
-    if (items.length === 0) return alert('Please add items to quote');
+    if (!customer) { toast.error('Please select a customer first.'); return; }
+    if (items.length === 0) { toast.error('Please add at least one product.'); return; }
 
     try {
       setIsSaving(true);
@@ -115,13 +118,35 @@ const QuoteBuilder = () => {
       const { error: itemsError } = await supabase.from('quote_items').insert(quoteItems);
       if (itemsError) throw itemsError;
 
-      setIsShareReady(true);
-      setTimeout(() => {
-        setIsShareReady(false);
-      }, 3000);
-    } catch (err) {
-      console.error(err);
-      alert('Failed to save quote');
+      // 1. Generate PDF Blob
+      const pdfBlob = await generateQuotePDF(
+        shop?.name || 'RetailFlow Shop',
+        customer,
+        items,
+        summary,
+        quote.id
+      );
+
+      // 2. Upload to Cloudflare R2
+      const fileName = `${quote.id}-${Date.now()}.pdf`;
+      const publicUrl = await uploadToR2(pdfBlob, fileName);
+
+      // 4. Open WhatsApp
+      const message = `Hi ${customer.name},\n\nHere is the quotation you requested from ${shop?.name || 'our shop'}. You can view or download the PDF using the link below:\n\n${publicUrl}\n\nThank you for your business!`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+
+      // Reset state so the same quote cannot be re-submitted
+      setItems([]);
+      setCustomer(customers[0] ?? null);
+      toast.success('Quote saved & shared successfully!');
+
+    } catch (err: any) {
+      console.error('Failed to save quote:', err);
+      if (err.message?.includes('RATE_LIMIT_QUOTES')) {
+        toast.error('Daily limit reached: max 100 quotes per day.');
+      } else {
+        toast.error('Failed to save quote: ' + err.message);
+      }
     } finally {
       setIsSaving(false);
     }
@@ -140,7 +165,7 @@ const QuoteBuilder = () => {
       <header className="mb-5 flex items-center justify-between">
         <button onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-xl text-textSecondary transition-colors hover:bg-sand hover:text-primary" aria-label="Back to dashboard"><ArrowLeft size={20} /></button>
         <div className="text-center"><p className="eyebrow">Draft quote</p><h1 className="mt-0.5 text-lg font-extrabold tracking-tight">New Quote</h1></div>
-        <button className="flex h-10 w-10 items-center justify-center rounded-xl text-textSecondary transition-colors hover:bg-sand hover:text-primary" aria-label="More quote options"><EllipsisVertical size={20} /></button>
+        <div className="h-10 w-10" />
       </header>
 
       <section className="rounded-2xl border border-border bg-surface p-3.5 shadow-sm">
@@ -205,9 +230,60 @@ const QuoteBuilder = () => {
         <div className="mx-3 mb-3 flex items-center justify-between rounded-xl bg-[linear-gradient(105deg,#FBE7CC,#F5D8A9)] px-4 py-3.5"><span className="text-sm font-extrabold text-textPrimary">Total amount</span><span className="text-xl font-extrabold tracking-tight text-textPrimary">{formatRupee(summary.total)}</span></div>
       </section>
 
-      <div className="sticky bottom-20 z-10 mt-5 bg-background/95 py-3 backdrop-blur"><Button onClick={shareQuote} disabled={isSaving} className="h-14 w-full gap-2 text-base">{isSaving ? <><Loader2 size={19} className="animate-spin" /> Saving Quote...</> : isShareReady ? <><Check size={19} /> Quote Saved & Ready to Share</> : <><Send size={19} /> Save & Share Quote</>}</Button><p className="mt-2 text-center text-[11px] text-textSecondary">A PDF and WhatsApp delivery flow will be connected next.</p></div>
+      <div className="sticky bottom-20 z-10 mt-5 bg-background/95 py-3 backdrop-blur">
+        <Button disabled={isSaving || !customer || items.length === 0} onClick={shareQuote} className="h-14 w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1DA851] text-white text-base">
+          {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+          {isSaving ? 'Generating PDF...' : 'Share via WhatsApp'}
+        </Button>
+      </div>
 
-      {isCustomerPickerOpen && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-primary/55 p-0 sm:items-center sm:p-4"><div className="w-full max-w-md rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl"><div className="flex items-center justify-between border-b border-border p-4"><div><p className="eyebrow">Quote for</p><h3 className="mt-0.5 text-lg font-extrabold">Choose customer</h3></div><button onClick={() => setIsCustomerPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-textSecondary hover:bg-sand" aria-label="Close customer picker"><X size={19} /></button></div><div className="p-3 max-h-[60vh] overflow-y-auto">{customers.length === 0 ? <p className="text-center text-sm text-textSecondary py-4">No customers found. Create one first.</p> : customers.map((person) => <button key={person.id} onClick={() => { setCustomer(person); setIsCustomerPickerOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-sand ${person.id === customer?.id ? 'bg-sand' : ''}`}><div className="flex h-10 w-10 items-center justify-center rounded-full bg-accentSoft text-xs font-extrabold text-[#9A482A]">{person.name.substring(0,2).toUpperCase()}</div><div className="min-w-0 flex-1"><p className="text-sm font-extrabold">{person.name}</p><p className="mt-0.5 text-xs text-textSecondary">{person.project_type || 'General'} · {person.location || 'Unknown'}</p></div>{person.id === customer?.id && <Check size={17} className="text-success" />}</button>)}</div></div></div>}
+      {isCustomerPickerOpen && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-primary/55 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between border-b border-border p-4 shrink-0">
+              <div>
+                <p className="eyebrow">Quote for</p>
+                <h3 className="mt-0.5 text-lg font-extrabold">Choose customer</h3>
+              </div>
+              <button onClick={() => setIsCustomerPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-textSecondary hover:bg-sand" aria-label="Close customer picker">
+                <X size={19} />
+              </button>
+            </div>
+            <div className="border-b border-border p-3 shrink-0">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-textSecondary" />
+                <input 
+                  type="text" 
+                  placeholder="Search customers..." 
+                  value={customerSearchQuery} 
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)} 
+                  className="w-full rounded-xl border border-border bg-[#FCFBF9] py-2.5 pl-9 pr-4 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" 
+                />
+              </div>
+            </div>
+            <div className="p-3 overflow-y-auto">
+              {customers.filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) || c.phone?.includes(customerSearchQuery)).length === 0 ? (
+                <p className="text-center text-sm text-textSecondary py-4">
+                  {customers.length === 0 ? 'No customers found. Create one first.' : 'No customers match your search.'}
+                </p>
+              ) : (
+                customers.filter(c => c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) || c.phone?.includes(customerSearchQuery)).map((person) => (
+                  <button key={person.id} onClick={() => { setCustomer(person); setIsCustomerPickerOpen(false); }} className={`flex w-full items-center gap-3 rounded-xl p-3 text-left transition-colors hover:bg-sand ${person.id === customer?.id ? 'bg-sand' : ''}`}>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accentSoft text-xs font-extrabold text-[#9A482A]">
+                      {person.name.substring(0,2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-extrabold truncate">{person.name}</p>
+                      <p className="mt-0.5 text-xs text-textSecondary truncate">{person.project_type || 'General'} · {person.location || 'Unknown'}</p>
+                    </div>
+                    {person.id === customer?.id && <Check size={17} className="text-success shrink-0" />}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {isProductPickerOpen && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-primary/55 p-0 sm:items-center sm:p-4"><div className="w-full max-w-md rounded-t-2xl bg-surface shadow-xl sm:rounded-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between border-b border-border p-4 shrink-0"><div><p className="eyebrow">Catalogue</p><h3 className="mt-0.5 text-lg font-extrabold">Add product</h3></div><button onClick={() => setIsProductPickerOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-textSecondary hover:bg-sand" aria-label="Close product picker"><X size={19} /></button></div>

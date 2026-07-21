@@ -434,3 +434,47 @@ entrypoint = "./functions/whatsapp-sender/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/whatsapp-sender/*.html" ]
+
+[functions.r2-presign]
+enabled = true
+verify_jwt = false
+import_map = "./functions/r2-presign/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/r2-presign/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/r2-presign/*.html" ]
+
+[functions.r2-fetch-image]
+enabled = true
+verify_jwt = false
+import_map = "./functions/r2-fetch-image/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/r2-fetch-image/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/r2-fetch-image/*.html" ]
+
+[functions.google-auth]
+enabled = true
+verify_jwt = false
+import_map = "./functions/google-auth/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/google-auth/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/google-auth/*.html" ]
+
+[functions.sync-google-sheet]
+enabled = true
+verify_jwt = false
+import_map = "./functions/sync-google-sheet/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/sync-google-sheet/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/sync-google-sheet/*.html" ]

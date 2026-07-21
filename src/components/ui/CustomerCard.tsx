@@ -16,10 +16,10 @@ interface CustomerCardProps {
 const statusStyle: Record<string, { label: string; chip: string; action: string }> = {
   new: { label: 'New lead', chip: 'bg-primary/10 text-primary', action: 'New enquiry' },
   follow_up: { label: 'Follow up', chip: 'bg-accent/10 text-accent', action: 'Follow up today' },
-  converted: { label: 'Won', chip: 'bg-success/10 text-success', action: 'Converted' },
+  converted: { label: 'Converted', chip: 'bg-success/10 text-success', action: 'Converted' },
   lost: { label: 'Lost', chip: 'bg-textSecondary/10 text-textSecondary', action: 'Closed' },
   quoted: { label: 'Quoted', chip: 'bg-warning/10 text-warning', action: 'Quote sent' },
-  won: { label: 'Won', chip: 'bg-success/10 text-success', action: 'Converted' },
+  won: { label: 'Converted', chip: 'bg-success/10 text-success', action: 'Converted' },
 };
 
 const formatRupee = (value: number | null) => value == null

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Database, Lock, ShieldCheck, Sparkles } from 'lucide-react';
+import { ChevronLeft, Database, Lock, ShieldCheck, Sparkles, ShieldAlert } from 'lucide-react';
 import { useRetailProfile } from '../../components/providers/RetailProfileProvider';
 
 const Privacy = () => {
@@ -54,6 +54,22 @@ const Privacy = () => {
           <p className="mt-2 text-sm leading-relaxed text-textSecondary">
             RetailFlow's AI uses your catalogue strictly to assist your showroom. Your private product margins and customer contact details are never used to train global AI models.
           </p>
+        </section>
+
+        <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm md:col-span-2">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-warning/10 text-warning">
+            <ShieldAlert size={22} />
+          </div>
+          <h3 className="text-lg font-extrabold text-textPrimary">Usage Limits & API Protection</h3>
+          <p className="mt-2 text-sm leading-relaxed text-textSecondary mb-4">
+            To protect against spam and ensure high performance for all workspaces, the following fair-use limits are enforced automatically:
+          </p>
+          <ul className="space-y-2 text-sm text-textSecondary list-disc pl-5">
+            <li><strong className="text-textPrimary">AI Images:</strong> 50 per user per day.</li>
+            <li><strong className="text-textPrimary">AI Chats:</strong> 100 messages per user per day. (Help Center remains untouched and limitless as requested).</li>
+            <li><strong className="text-textPrimary">Quotes:</strong> 100 quotes per user per day.</li>
+            <li><strong className="text-textPrimary">Products:</strong> 100 products per user per hour, and 5,000 total products per workspace.</li>
+          </ul>
         </section>
 
         <section className="rounded-2xl border border-border bg-surface p-6 shadow-sm md:col-span-2">

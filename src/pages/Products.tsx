@@ -1,55 +1,71 @@
-import { useEffect, useMemo, useState } from 'react';
-import { PackageSearch, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { useMemo, useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { PackageSearch, Plus, Search, SlidersHorizontal, Download, Upload, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Product } from '../types';
+import { exportProductsToCSV, importProductsFromCSV } from '../lib/csvHelper';
+import { toast } from 'react-hot-toast';
 import { ProductCard } from '../components/ui/ProductCard';
 import { Button } from '../components/ui/Button';
+import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import { useTranslation } from 'react-i18next';
 import { AddProductModal } from '../components/products/AddProductModal';
 import { ProductDetailsModal } from '../components/products/ProductDetailsModal';
+import { CsvImportTutorialModal } from '../components/products/CsvImportTutorialModal';
 
 
 type ProductFilter = 'all' | 'low_stock' | string;
 
 const Products = () => {
   const { t } = useTranslation();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { userProfile } = useRetailProfile();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<ProductFilter>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [selectedProductForDetails, setSelectedProductForDetails] = useState<Product | null>(null);
   const [shopId, setShopId] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [isTutorialModalOpen, setIsTutorialModalOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchProducts(); }, []);
-
-  const fetchProducts = async () => {
-    try {
-      setLoading(true);
+  const { data: productsData = [], isLoading: loading } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error('Not authenticated');
+      
       const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', session.user.id).single();
       if (profile) setShopId(profile.shop_id);
-      const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+      
+      const { data, error } = await supabase.from('products').select('*').eq('is_archived', false).order('created_at', { ascending: false }).limit(1000);
       if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      console.error('Error fetching products:', error);
-    } finally {
-      setLoading(false);
+      return data || [];
     }
-  };
+  });
+  
+  // Keep local products state for filtering or use data directly
+  const products = productsData;
 
-  const handleDeleteProduct = async (id: string) => {
-    try {
-      const { error } = await supabase.from('products').delete().eq('id', id);
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('products').update({ is_archived: true }).eq('id', id);
       if (error) throw error;
-      setProducts((current) => current.filter((product) => product.id !== id));
-    } catch (error: any) {
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+    },
+    onError: (error: any) => {
       console.error('Error deleting product:', error);
-      alert('Failed to delete product: ' + error.message);
+      toast.error('Failed to delete product: ' + error.message);
     }
+  });
+
+  const handleDeleteProduct = (id: string) => {
+    deleteProductMutation.mutate(id);
   };
 
   const filters = useMemo(() => {
@@ -77,9 +93,32 @@ const Products = () => {
           <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">{t('products.title')}</h2>
           <p className="mt-1 text-sm text-textSecondary">{products.length} {t('products.in_catalogue')}</p>
         </div>
-        <Button size="sm" className="shrink-0 gap-1.5" onClick={() => { setProductToEdit(null); setIsAddModalOpen(true); }}>
-          <Plus size={18} /> {t('products.add_new')}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => exportProductsToCSV(products)}>
+            <Download size={18} /> Export CSV
+          </Button>
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" disabled={isImporting} onClick={() => setIsTutorialModalOpen(true)}>
+            {isImporting ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Import CSV
+          </Button>
+          <input type="file" accept=".csv, .zip" className="hidden" ref={fileInputRef} onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file || !shopId) return;
+            setIsImporting(true);
+            try {
+              const count = await importProductsFromCSV(file, shopId);
+              toast.success(`Imported ${count} products successfully!`);
+              queryClient.invalidateQueries({ queryKey: ['products'] });
+            } catch (err: any) {
+              toast.error('Import failed: ' + err.message);
+            } finally {
+              setIsImporting(false);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+          }} />
+          <Button size="sm" className="shrink-0 gap-1.5" onClick={() => { setProductToEdit(null); setIsAddModalOpen(true); }}>
+            <Plus size={18} /> {t('products.add_new')}
+          </Button>
+        </div>
       </header>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -106,11 +145,20 @@ const Products = () => {
           <Button className="mt-5 gap-2" onClick={() => { setProductToEdit(null); setIsAddModalOpen(true); }}><Plus size={18} /> {t('products.add_new')}</Button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{filteredProducts.map((product) => <ProductCard key={product.id} product={product} onClick={setSelectedProductForDetails} onEdit={setProductToEdit} onDelete={handleDeleteProduct} />)}</div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">{filteredProducts.map((product) => <ProductCard key={product.id} product={product} onClick={setSelectedProductForDetails} onEdit={setProductToEdit} onDelete={(userProfile?.role === 'owner' || userProfile?.has_full_access) ? handleDeleteProduct : undefined} />)}</div>
       )}
 
-      <AddProductModal isOpen={isAddModalOpen || Boolean(productToEdit)} onClose={() => { setIsAddModalOpen(false); setProductToEdit(null); }} onProductAdded={() => { fetchProducts(); setProductToEdit(null); }} shopId={shopId} productToEdit={productToEdit} />
+      <AddProductModal isOpen={isAddModalOpen || Boolean(productToEdit)} onClose={() => { setIsAddModalOpen(false); setProductToEdit(null); }} onProductAdded={() => { queryClient.invalidateQueries({ queryKey: ['products'] }); setProductToEdit(null); }} shopId={shopId} productToEdit={productToEdit} />
       <ProductDetailsModal isOpen={Boolean(selectedProductForDetails)} product={selectedProductForDetails} onClose={() => setSelectedProductForDetails(null)} />
+      <CsvImportTutorialModal 
+        isOpen={isTutorialModalOpen} 
+        onClose={() => setIsTutorialModalOpen(false)} 
+        onProceed={() => {
+          setIsTutorialModalOpen(false);
+          fileInputRef.current?.click();
+        }}
+        onDownloadTemplate={() => exportProductsToCSV([])}
+      />
     </div>
   );
 };

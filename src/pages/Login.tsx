@@ -12,6 +12,7 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +50,19 @@ const Login = () => {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) { setError('Please enter your email address first.'); return; }
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) setError(error.message);
+    else setSuccess('Password reset email sent! Check your inbox.');
+    setLoading(false);
   };
 
   return (
@@ -131,6 +145,15 @@ const Login = () => {
               >
                 {t('login.password')}
               </label>
+              {!isSignUp && (
+                <button
+                  type="button"
+                  onClick={() => { setIsForgotPassword(true); setError(null); setSuccess(null); }}
+                  className="text-xs font-semibold text-primary hover:text-primary/80"
+                >
+                  Forgot password?
+                </button>
+              )}
             </div>
             <div className="mt-2">
               <input
@@ -163,6 +186,31 @@ const Login = () => {
           </button>
         </p>
       </div>
+
+      {isForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-xl">
+            <h3 className="text-lg font-extrabold text-textPrimary">Reset Password</h3>
+            <p className="mt-1 text-sm text-textSecondary">Enter your email and we'll send you a reset link.</p>
+            <form onSubmit={handleForgotPassword} className="mt-5 space-y-4">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="block min-h-[48px] w-full rounded-xl border border-border bg-background px-3 py-2.5 text-textPrimary outline-none placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15 sm:text-sm"
+              />
+              {error && <p className="text-xs text-error">{error}</p>}
+              {success && <p className="text-xs text-success">{success}</p>}
+              <div className="flex gap-3">
+                <button type="button" onClick={() => { setIsForgotPassword(false); setError(null); setSuccess(null); }} className="flex-1 rounded-xl border border-border py-2.5 text-sm font-bold text-textSecondary hover:bg-sand">Cancel</button>
+                <button type="submit" disabled={loading} className="flex-1 rounded-xl bg-primary py-2.5 text-sm font-bold text-white hover:bg-primaryHover disabled:opacity-60">{loading ? 'Sending...' : 'Send Reset Link'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

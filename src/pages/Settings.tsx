@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
+import { toast } from 'react-hot-toast';
+import { uploadToR2 } from '../lib/r2Storage';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import { retailProfiles } from '../config/retailProfiles';
 import type { ModuleId } from '../config/retailProfiles';
 import { Check, ArrowLeft } from 'lucide-react';
 import { ImageCropModal } from '../components/ui/ImageCropModal';
+import { CsvImportTutorialModal } from '../components/products/CsvImportTutorialModal';
+import { importProductsFromCSV, exportProductsToCSV } from '../lib/csvHelper';
+import { Upload, Loader2 } from 'lucide-react';
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -22,6 +27,10 @@ const Settings = () => {
   const [themePreference, setThemePreference] = useState<'default' | 'dark' | 'dynamic'>(shop?.branding?.theme || 'dynamic');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [selectedImageToCrop, setSelectedImageToCrop] = useState<string | null>(null);
+
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const updateSetting = (key: string, value: any) => {
     setShopSettings(prev => ({ ...prev, [key]: value }));
@@ -46,25 +55,103 @@ const Settings = () => {
     setUploadingLogo(true);
     try {
       const fileExt = 'png';
-      const fileName = `${shop.id}-logo-${Date.now()}.${fileExt}`;
-      const filePath = `logos/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('product-images')
-        .upload(filePath, croppedFile);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(filePath);
-
+      const fileName = `shop-logo-${shop.id}-${Date.now()}.${fileExt}`;
+      
+      const publicUrl = await uploadToR2(croppedFile, fileName);
       updateSetting('logoUrl', publicUrl);
     } catch (error: any) {
       console.error('Error uploading logo:', error);
-      alert('Failed to upload logo: ' + error.message);
+      toast.error('Failed to upload logo: ' + error.message);
     } finally {
       setUploadingLogo(false);
+    }
+  };
+
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
+
+  const handleConnectGoogle = async () => {
+    if (!shop?.id) return;
+    try {
+      setSyncingGoogle(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/google-auth?shop_id=${shop.id}`;
+      const res = await fetch(functionUrl, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      });
+      const resData = await res.json();
+      if (res.ok && resData.url) {
+        window.location.href = resData.url;
+      } else {
+        throw new Error(resData.error || 'Failed to get auth URL');
+      }
+    } catch (err: any) {
+      toast.error('Failed to connect: ' + err.message);
+    } finally {
+      setSyncingGoogle(false);
+    }
+  };
+
+  const handleSyncGoogle = async () => {
+    try {
+      setSyncingGoogle(true);
+      const { data, error } = await supabase.functions.invoke('sync-google-sheet', {
+        method: 'POST'
+      });
+      if (error) throw error;
+      toast.success(data?.message || 'Sync successful!');
+      await refreshProfile();
+    } catch (err: any) {
+      toast.error('Failed to sync: ' + err.message);
+    } finally {
+      setSyncingGoogle(false);
+    }
+  };
+
+  const handleOpenPicker = async () => {
+    try {
+      setSyncingGoogle(true);
+      // 1. Get access token from edge function
+      const { data, error } = await supabase.functions.invoke('sync-google-sheet?action=get_token', {
+        method: 'POST'
+      });
+      if (error) throw error;
+      const token = data?.access_token;
+      if (!token) throw new Error('No token returned');
+
+      // 2. Open Google Picker
+      const showPicker = () => {
+        const picker = new (window as any).google.picker.PickerBuilder()
+          .addView((window as any).google.picker.ViewId.SPREADSHEETS)
+          .setOAuthToken(token)
+          .setCallback(async (pickerData: any) => {
+            if (pickerData.action === (window as any).google.picker.Action.PICKED) {
+              const doc = pickerData.docs[0];
+              const fileId = doc.id;
+              
+              // Save to shop
+              const { error: updateError } = await supabase
+                .from('shops')
+                .update({ connected_spreadsheet_id: fileId })
+                .eq('id', shop?.id);
+                
+              if (updateError) {
+                toast.error('Failed to link spreadsheet');
+              } else {
+                toast.success(`Spreadsheet linked!`);
+                await refreshProfile();
+              }
+            }
+          })
+          .build();
+        picker.setVisible(true);
+      };
+
+      (window as any).gapi.load('picker', { callback: showPicker });
+    } catch (err: any) {
+      toast.error('Failed to open picker: ' + err.message);
+    } finally {
+      setSyncingGoogle(false);
     }
   };
 
@@ -114,7 +201,7 @@ const Settings = () => {
       navigate('/more');
     } catch (error: any) {
       console.error(error);
-      alert("Error saving settings: " + (error.message || 'Unknown error'));
+      toast.error("Error saving settings: " + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -437,6 +524,61 @@ const Settings = () => {
         </div>
       </section>
 
+      <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">
+        <h3 className="text-lg font-bold">Integrations</h3>
+        <p className="text-sm text-textSecondary">Connect external tools like Google Sheets to manage your catalog automatically.</p>
+        <div className="mt-4 p-4 border border-border rounded-xl flex items-center justify-between bg-surface">
+          <div>
+            <h4 className="font-semibold text-textPrimary">Google Sheets Sync</h4>
+            <p className="text-sm text-textSecondary">Manage your products in a live spreadsheet.</p>
+          </div>
+          <div>
+            {!shop?.google_refresh_token ? (
+              <Button onClick={handleConnectGoogle} disabled={syncingGoogle} className="gap-2">
+                Connect Account
+              </Button>
+            ) : (
+              <div className="flex flex-col items-end gap-3">
+                <span className="text-sm font-medium text-success flex items-center gap-1"><Check size={16}/> Connected</span>
+                <div className="flex items-center gap-2">
+                  <Button onClick={handleOpenPicker} disabled={syncingGoogle} variant="outline" className="gap-2">
+                    {syncingGoogle ? '...' : 'Select File'}
+                  </Button>
+                  <Button onClick={handleSyncGoogle} disabled={syncingGoogle} variant="outline" className="gap-2">
+                    {syncingGoogle ? 'Syncing...' : 'Sync Now'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="mt-4 p-4 border border-border rounded-xl flex items-center justify-between bg-surface">
+          <div>
+            <h4 className="font-semibold text-textPrimary">CSV File Upload</h4>
+            <p className="text-sm text-textSecondary">Manually bulk import products using a spreadsheet or ZIP.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowTutorial(true)} disabled={isImporting} className="gap-2">
+              {isImporting ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />} Import CSV
+            </Button>
+            <input type="file" accept=".csv, .zip" className="hidden" ref={fileInputRef} onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file || !shop?.id) return;
+              try {
+                setIsImporting(true);
+                const count = await importProductsFromCSV(file, shop.id);
+                toast.success(`Successfully imported ${count} products!`);
+              } catch (err: any) {
+                toast.error(err.message || 'Failed to import CSV');
+              } finally {
+                setIsImporting(false);
+                if (fileInputRef.current) fileInputRef.current.value = '';
+              }
+            }} />
+          </div>
+        </div>
+      </section>
+
       <div className="flex justify-end gap-3 pt-4">
         <Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
         <Button onClick={handleSave} disabled={loading}>
@@ -451,6 +593,16 @@ const Settings = () => {
           onCropComplete={handleCropComplete}
         />
       )}
+
+      <CsvImportTutorialModal 
+        isOpen={showTutorial} 
+        onClose={() => setShowTutorial(false)}
+        onProceed={() => {
+          setShowTutorial(false);
+          fileInputRef.current?.click();
+        }}
+        onDownloadTemplate={() => exportProductsToCSV([])}
+      />
     </div>
   );
 };

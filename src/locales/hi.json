@@ -55,7 +55,9 @@
     "deals": "सौदे जारी रखें",
     "attention": "ध्यान देने योग्य फॉलो-अप",
     "view_all": "सभी देखें",
-    "follow_up_action": "फॉलो-अप करें"
+    "follow_up_action": "फॉलो-अप करें",
+    "quotes_vs_sales": "कोटेशन बनाम बिक्री",
+    "top_products": "शीर्ष उत्पाद"
   },
   "products": {
     "title": "उत्पाद",
@@ -93,6 +95,10 @@
       "location": "उदा. मुंबई"
     },
     "status": {
+      "new": "नया",
+      "follow_up": "फॉलो-अप",
+      "converted": "कनवर्टेड",
+      "lost": "लॉस्ट",
       "all": "सभी",
       "planning": "प्लानिंग",
       "visiting": "विजिटिंग",

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, UserPlus, X, Plus, Check, Minus, UsersRound } from 'lucide-react';
+import { Search, UserPlus, X, Plus, Check, Minus, UsersRound, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Customer, Product } from '../types';
 import { CustomerCard } from '../components/ui/CustomerCard';
 import { Button } from '../components/ui/Button';
-
+import { exportCustomersToCSV } from '../lib/csvHelper';
+import toast from 'react-hot-toast';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 
 const PROJECT_TYPES = ['Residential', 'Commercial', 'Office', 'Hotel', 'Retail', 'Other'];
@@ -14,7 +15,7 @@ const STATUS_FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'new', label: 'New' },
   { id: 'follow_up', label: 'Follow-up' },
-  { id: 'converted', label: 'Won' },
+  { id: 'converted', label: 'Converted' },
   { id: 'lost', label: 'Lost' },
 ];
 
@@ -123,7 +124,8 @@ const Customers = () => {
         .from('products')
         .select('*')
         .eq('shop_id', profile.shop_id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(1000);
         
       if (products) setShopProducts(products as Product[]);
     } catch (error) {
@@ -137,7 +139,9 @@ const Customers = () => {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
-        .order('created_at', { ascending: false });
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .limit(1000);
 
       if (error) throw error;
       setCustomers(data || []);
@@ -239,7 +243,7 @@ const Customers = () => {
       fetchCustomers();
     } catch (err: any) {
       console.error(err);
-      alert('Failed to add customer: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to add customer: ' + (err.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
@@ -260,9 +264,14 @@ const Customers = () => {
           <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">{t('customers.title')}</h2>
           <p className="mt-1 text-sm text-textSecondary">{t('customers.subtitle', { item: labels.customerVisit || 'visit' })}</p>
         </div>
-        <Button size="sm" className="shrink-0 gap-1.5" onClick={handleOpenModal}>
-          <UserPlus size={17} /> {t('customers.add_new')}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => exportCustomersToCSV(customers)}>
+            <Download size={18} /> Export CSV
+          </Button>
+          <Button size="sm" className="shrink-0 gap-1.5" onClick={handleOpenModal}>
+            <UserPlus size={17} /> {t('customers.add_new')}
+          </Button>
+        </div>
       </header>
 
       <div className="rounded-2xl border border-accent/20 bg-accentSoft px-4 py-3">

@@ -2,3 +2,5 @@
 - Always run the local development server strictly on port 5174 because this is the exact `localhost` URL registered in the Supabase OAuth Redirect settings. Do not let the server pick a random port.
 - Always run `npm run build` locally to verify TypeScript compilation and catch any unused variables or missing imports before declaring a feature complete or pushing to GitHub.
 - For Single Page Applications (SPAs) deployed to GitHub Pages, always ensure that the build step copies `index.html` to `404.html` (e.g., `cp dist/index.html dist/404.html`) so that client-side routing survives browser reloads and direct link navigations.
+- All file uploads (images, PDFs, documents) MUST use the `src/lib/r2Storage.ts` utility to upload directly to Cloudflare R2 via presigned URLs. Do NOT use `supabase.storage` anywhere in the application.
+- Whenever installing new NPM dependencies, automatically restart the local Vite dev server. The server can be restarted by finding and killing the process on port 5174 and then running `npm run dev -- --port 5174`.

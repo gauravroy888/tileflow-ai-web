@@ -55,7 +55,9 @@
     "deals": "Keep deals moving",
     "attention": "Follow-ups needing attention",
     "view_all": "View all",
-    "follow_up_action": "Follow up"
+    "follow_up_action": "Follow up",
+    "quotes_vs_sales": "Quotes vs Sales",
+    "top_products": "Top Products"
   },
   "products": {
     "title": "Products",
@@ -93,6 +95,10 @@
       "location": "e.g. Mumbai"
     },
     "status": {
+      "new": "New",
+      "follow_up": "Follow Up",
+      "converted": "Converted",
+      "lost": "Lost",
       "all": "All",
       "planning": "Planning",
       "visiting": "Visiting",
