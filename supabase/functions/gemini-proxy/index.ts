@@ -50,30 +50,69 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'generateImage') {
-      // Direct REST API for image generation
-      const modelName = 'gemini-3.1-flash-lite-image';
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: parts }],
-            generationConfig: {
-              responseModalities: ['IMAGE', 'TEXT'],
-              imageGenerationConfig: { outputResolution: '1024x1024' },
-            },
-          }),
+      const openAiKey = Deno.env.get('OPENAI_API_KEY');
+      if (!openAiKey) {
+        return new Response(JSON.stringify({ error: 'OPENAI_API_KEY is not configured for image generation.' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const partsArr = parts || [];
+      const imagePrompt = partsArr.map((p: any) => p.text || '').join(' ').trim() || 'Edit this image';
+
+      const formData = new FormData();
+      formData.append('model', 'gpt-image-2');
+      formData.append('prompt', imagePrompt);
+      formData.append('n', '1');
+      formData.append('size', '1024x1024');
+      formData.append('response_format', 'b64_json');
+
+      if (imageParts && imageParts.length > 0) {
+        const baseImage = imageParts[0].inlineData;
+        if (baseImage) {
+          const binary = atob(baseImage.data);
+          const array = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            array[i] = binary.charCodeAt(i);
+          }
+          const blob = new Blob([array], { type: baseImage.mimeType });
+          formData.append('image', blob, 'image.png');
         }
-      );
+      }
+
+      const response = await fetch('https://api.openai.com/v1/images/edits', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${openAiKey}`
+        },
+        body: formData,
+      });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(`Gemini image gen error: ${response.status} - ${errData?.error?.message || JSON.stringify(errData)}`);
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(`OpenAI image edit error: ${response.status} - ${errData?.error?.message || JSON.stringify(errData)}`);
       }
 
       const data = await response.json();
-      return new Response(JSON.stringify(data), {
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) throw new Error('No image data returned from OpenAI');
+
+      // Return the data in the exact same format that the frontend (AI.tsx) expects for Gemini
+      const fakeGeminiFormat = {
+        candidates: [{
+          content: {
+            parts: [{
+              inlineData: {
+                mimeType: 'image/png',
+                data: b64
+              }
+            }]
+          }
+        }]
+      };
+
+      return new Response(JSON.stringify(fakeGeminiFormat), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
