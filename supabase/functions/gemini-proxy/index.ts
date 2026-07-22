@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
+import { encodeBase64 } from "jsr:@std/encoding/base64";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -102,13 +103,7 @@ Deno.serve(async (req) => {
       if (!imageRes.ok) throw new Error('Failed to fetch generated image from OpenAI URL');
       const arrayBuffer = await imageRes.arrayBuffer();
       
-      let binary = '';
-      const bytes = new Uint8Array(arrayBuffer);
-      const len = bytes.byteLength;
-      for (let i = 0; i < len; i++) {
-          binary += String.fromCharCode(bytes[i]);
-      }
-      const b64 = btoa(binary);
+      const b64 = encodeBase64(arrayBuffer);
 
       // Return the data in the exact same format that the frontend (AI.tsx) expects for Gemini
       const fakeGeminiFormat = {
