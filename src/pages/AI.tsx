@@ -274,6 +274,7 @@ const AI = () => {
     setLoadingStatus('Analyzing with Gemini...');
     setGeneratedText(null);
     setGeneratedImageUrl(null);
+    setShareCurrentImageUrl(null);
 
     try {
       let prompt = '';
@@ -691,10 +692,18 @@ const AI = () => {
                       }}>
                         <Download size={18} className="mr-2" /> Download
                       </Button>
-                      <Button className="flex-1 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white" onClick={() => {
-                        setIsShareModalOpen(true);
-                      }}>
-                        <Share2 size={18} className="mr-2" /> Share to WhatsApp
+                      <Button 
+                        className="flex-1 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white disabled:opacity-50 disabled:cursor-not-allowed" 
+                        disabled={!shareCurrentImageUrl}
+                        onClick={() => {
+                          setIsShareModalOpen(true);
+                        }}
+                      >
+                        {shareCurrentImageUrl ? (
+                          <><Share2 size={18} className="mr-2" /> Share to WhatsApp</>
+                        ) : (
+                          <><Sparkles size={18} className="mr-2 animate-pulse" /> Uploading...</>
+                        )}
                       </Button>
                     </div>
                   </div>
