@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       const imagePrompt = partsArr.map((p: any) => p.text || '').join(' ').trim() || 'Edit this image';
 
       const formData = new FormData();
-      formData.append('model', 'gpt-image-2');
+      formData.append('model', 'dall-e-2');
       formData.append('prompt', imagePrompt);
       formData.append('n', '1');
       formData.append('size', '1024x1024');
@@ -76,8 +76,8 @@ Deno.serve(async (req) => {
           for (let i = 0; i < binary.length; i++) {
             array[i] = binary.charCodeAt(i);
           }
-          const blob = new Blob([array], { type: baseImage.mimeType });
-          formData.append('image', blob, 'image.png');
+          const file = new File([array], 'image.png', { type: 'image/png' });
+          formData.append('image', file);
         }
       }
 
