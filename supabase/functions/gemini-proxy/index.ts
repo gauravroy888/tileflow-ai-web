@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
               array[j] = binary.charCodeAt(j);
             }
             const file = new File([array], `image_${i}.png`, { type: 'image/png' });
-            formData.append('image', file);
+            formData.append('image[]', file);
           }
         }
       }
