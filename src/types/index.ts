@@ -103,3 +103,10 @@ export interface AppNotification {
   created_at: string;
 }
 
+export interface AIGeneratedImage {
+  id: string;
+  shop_id: string;
+  generated_image_url: string;
+  prompt: string | null;
+  created_at: string;
+}

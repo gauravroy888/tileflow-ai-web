@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowRight, Camera, Check, ClipboardList, PackageSearch, Plus, Send, Sparkles, TrendingUp, X, Image as ImageIcon } from 'lucide-react';
+import { ArrowRight, Camera, Check, ClipboardList, PackageSearch, Plus, Send, Sparkles, TrendingUp, X, Image as ImageIcon, Download, Phone, History, Share2 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { supabase } from '../lib/supabase';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import ReactMarkdown from 'react-markdown';
 import { Menu, MessageSquare, Plus as PlusIcon, Trash2, Clock } from 'lucide-react';
-import type { Product, Customer, ChatSession } from '../types';
+import type { Product, Customer, ChatSession, AIGeneratedImage } from '../types';
+import { uploadToR2 } from '../lib/r2Storage';
 
 type ToolType = string | null;
 
@@ -50,6 +51,15 @@ const AI = () => {
   const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
 
+  // Image History State
+  const [generatedImagesHistory, setGeneratedImagesHistory] = useState<AIGeneratedImage[]>([]);
+  const [isImageHistoryOpen, setIsImageHistoryOpen] = useState(false);
+
+  // Share State
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareCustomerSearch, setShareCustomerSearch] = useState('');
+  const [shareCurrentImageUrl, setShareCurrentImageUrl] = useState<string | null>(null);
+
   useEffect(() => {
     const fetchShopAndProducts = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -80,6 +90,7 @@ const AI = () => {
         if (customers) setShopCustomers(customers as Customer[]);
 
         fetchChatSessions(profile.shop_id);
+        fetchImageHistory(profile.shop_id);
       }
     };
     fetchShopAndProducts();
@@ -93,6 +104,15 @@ const AI = () => {
       .order('updated_at', { ascending: false })
       .limit(20);
     if (data) setChatSessions(data as ChatSession[]);
+  };
+
+  const fetchImageHistory = async (sId: string) => {
+    const { data } = await supabase
+      .from('ai_generated_images')
+      .select('*')
+      .eq('shop_id', sId)
+      .order('created_at', { ascending: false });
+    if (data) setGeneratedImagesHistory(data as AIGeneratedImage[]);
   };
 
   const loadSession = async (session: ChatSession) => {
@@ -141,6 +161,18 @@ const AI = () => {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
+  };
+
+  const dataURLtoFile = (dataurl: string, filename: string) => {
+    const arr = dataurl.split(',');
+    const mime = arr[0].match(/:(.*?);/)?.[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, { type: mime });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -347,6 +379,30 @@ const AI = () => {
                 setGeneratedImageUrl(dataUrl);
                 imageGenerated = true;
                 setGeneratedText("Here is your newly designed space, incorporating your selected products!");
+                
+                // Save to history and R2
+                try {
+                  const filename = `gen_${Date.now()}.png`;
+                  const file = dataURLtoFile(dataUrl, filename);
+                  uploadToR2(file, filename).then((hostedUrl: string) => {
+                    if (hostedUrl) {
+                      supabase.from('ai_generated_images').insert({
+                        shop_id: shopId,
+                        generated_image_url: hostedUrl,
+                        prompt: toolPrompt
+                      }).select().single().then(({ data: newRec }) => {
+                        if (newRec) {
+                          setGeneratedImagesHistory(prev => [newRec as AIGeneratedImage, ...prev]);
+                          // Pre-populate share URL with hosted URL if they want to share immediately
+                          setShareCurrentImageUrl(hostedUrl);
+                        }
+                      });
+                    }
+                  });
+                } catch (uploadErr) {
+                  console.error("Failed to host generated image:", uploadErr);
+                }
+                
                 break;
               }
             }
@@ -427,14 +483,24 @@ const AI = () => {
                   {profile.aiFeatures.find(f => f.id === activeTool)?.title || 'AI Tool'}
                 </h3>
               </div>
-              {activeTool === 'chat' && (
-                <button 
-                  onClick={() => setIsHistoryOpen(true)}
-                  className="rounded-xl bg-surfaceHover px-3 py-2 text-xs font-bold text-textPrimary flex items-center gap-2 border border-border shadow-sm hover:border-primary/50 transition-colors"
-                >
-                  <Menu size={16} /> History
-                </button>
-              )}
+              <div className="flex gap-2">
+                {['vision_with_image', 'image_generation'].includes(profile.aiFeatures.find(f => f.id === activeTool)?.type || '') && (
+                  <button 
+                    onClick={() => setIsImageHistoryOpen(true)}
+                    className="rounded-xl bg-surfaceHover px-3 py-2 text-xs font-bold text-textPrimary flex items-center gap-2 border border-border shadow-sm hover:border-primary/50 transition-colors"
+                  >
+                    <History size={16} /> History
+                  </button>
+                )}
+                {activeTool === 'chat' && (
+                  <button 
+                    onClick={() => setIsHistoryOpen(true)}
+                    className="rounded-xl bg-surfaceHover px-3 py-2 text-xs font-bold text-textPrimary flex items-center gap-2 border border-border shadow-sm hover:border-primary/50 transition-colors"
+                  >
+                    <Menu size={16} /> History
+                  </button>
+                )}
+              </div>
             </div>
 
             {activeTool === 'chat' ? (
@@ -612,8 +678,25 @@ const AI = () => {
                 </Button>
 
                 {generatedImageUrl && (
-                  <div className="mt-6 rounded-2xl overflow-hidden border border-border shadow-md">
-                    <img src={generatedImageUrl} alt="Generated Design" className="w-full h-auto object-cover" />
+                  <div className="mt-6 space-y-3">
+                    <div className="rounded-2xl overflow-hidden border border-border shadow-md">
+                      <img src={generatedImageUrl} alt="Generated Design" className="w-full h-auto object-cover" />
+                    </div>
+                    <div className="flex gap-3">
+                      <Button variant="secondary" className="flex-1 py-3" onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = generatedImageUrl;
+                        a.download = `ai_design_${Date.now()}.png`;
+                        a.click();
+                      }}>
+                        <Download size={18} className="mr-2" /> Download
+                      </Button>
+                      <Button className="flex-1 py-3 bg-[#25D366] hover:bg-[#128C7E] text-white" onClick={() => {
+                        setIsShareModalOpen(true);
+                      }}>
+                        <Share2 size={18} className="mr-2" /> Share to WhatsApp
+                      </Button>
+                    </div>
                   </div>
                 )}
                 
@@ -750,6 +833,99 @@ const AI = () => {
           )}
         </div>
       </div>
+
+      {/* Image History Slide-out Sidebar */}
+      <div 
+        className={`fixed inset-0 z-[200] bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${isImageHistoryOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} 
+        onClick={() => setIsImageHistoryOpen(false)}
+      />
+      <div 
+        className={`fixed top-0 right-0 h-full w-full max-w-md bg-surface shadow-2xl z-[201] flex flex-col transition-transform duration-300 transform ${isImageHistoryOpen ? 'translate-x-0' : 'translate-x-full'}`}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+          <h2 className="text-lg font-bold text-textPrimary flex items-center gap-2"><History size={18} /> Generated Images</h2>
+          <button onClick={() => setIsImageHistoryOpen(false)} className="p-2 hover:bg-sand rounded-xl"><X size={20} className="text-textSecondary" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {generatedImagesHistory.length === 0 ? (
+            <p className="text-center text-sm text-textSecondary py-8">No previously generated images found.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              {generatedImagesHistory.map((img) => (
+                <div key={img.id} className="relative group rounded-xl overflow-hidden border border-border shadow-sm">
+                  <img src={img.generated_image_url} alt={img.prompt || 'Generated image'} className="w-full aspect-square object-cover" />
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                    <p className="text-xs text-white line-clamp-3 mb-2">{img.prompt}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => {
+                         setShareCurrentImageUrl(img.generated_image_url);
+                         setIsShareModalOpen(true);
+                      }} className="flex-1 bg-[#25D366] text-white py-1.5 rounded-lg text-xs font-bold flex items-center justify-center hover:bg-[#128C7E]">
+                        <Share2 size={12} className="mr-1"/> Share
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Share to WhatsApp Modal */}
+      {isShareModalOpen && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-surface w-full max-w-md rounded-2xl shadow-xl flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-border bg-gray-50 shrink-0">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-textPrimary"><Phone size={18} className="text-[#25D366]" /> Share via WhatsApp</h3>
+              <button onClick={() => setIsShareModalOpen(false)} className="text-gray-500 hover:bg-gray-200 p-2 rounded-full transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-4 border-b border-border shrink-0">
+               <input
+                 type="text"
+                 placeholder="Search customers..."
+                 value={shareCustomerSearch}
+                 onChange={e => setShareCustomerSearch(e.target.value)}
+                 className="w-full bg-sand border border-border rounded-xl px-4 py-2.5 text-sm outline-none focus:border-primary/50"
+               />
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 max-h-[40vh]">
+              {shopCustomers.filter(c => c.name.toLowerCase().includes(shareCustomerSearch.toLowerCase()) || (c.phone && c.phone.includes(shareCustomerSearch))).length === 0 ? (
+                 <div className="p-4 text-center text-sm text-textSecondary">No customers found.</div>
+              ) : (
+                 shopCustomers
+                   .filter(c => c.name.toLowerCase().includes(shareCustomerSearch.toLowerCase()) || (c.phone && c.phone.includes(shareCustomerSearch)))
+                   .map(c => (
+                     <button
+                       key={c.id}
+                       className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-sand transition-colors text-left"
+                       onClick={() => {
+                         if (!shareCurrentImageUrl) {
+                            alert("Image is still being uploaded to the server. Please try sharing again in a few seconds.");
+                            return;
+                         }
+                         const text = `Hi ${c.name}, I wanted to share this new design concept we created for you! Check it out here: ${shareCurrentImageUrl}`;
+                         const waUrl = `https://wa.me/${c.phone?.replace(/[^0-9]/g, '') || ''}?text=${encodeURIComponent(text)}`;
+                         window.open(waUrl, '_blank');
+                         setIsShareModalOpen(false);
+                       }}
+                     >
+                       <div>
+                         <p className="font-bold text-sm text-textPrimary">{c.name}</p>
+                         <p className="text-xs text-textSecondary mt-0.5">{c.phone || 'No phone'}</p>
+                       </div>
+                       <Share2 size={16} className="text-textSecondary" />
+                     </button>
+                   ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
