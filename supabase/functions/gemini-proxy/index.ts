@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
 
       const data = await response.json();
       const imageUrl = data.data?.[0]?.url;
-      if (!imageUrl) throw new Error('No image URL returned from OpenAI');
+      if (!imageUrl) throw new Error('No image URL returned from OpenAI. Response: ' + JSON.stringify(data));
 
       // Fetch the image and convert to base64
       const imageRes = await fetch(imageUrl);
