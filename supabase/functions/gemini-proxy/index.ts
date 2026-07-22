@@ -62,11 +62,10 @@ Deno.serve(async (req) => {
       const imagePrompt = partsArr.map((p: any) => p.text || '').join(' ').trim() || 'Edit this image';
 
       const formData = new FormData();
-      formData.append('model', 'dall-e-2');
+      formData.append('model', 'gpt-image-2');
       formData.append('prompt', imagePrompt);
       formData.append('n', '1');
       formData.append('size', '1024x1024');
-      formData.append('response_format', 'b64_json');
 
       if (imageParts && imageParts.length > 0) {
         const baseImage = imageParts[0].inlineData;
@@ -95,8 +94,21 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      const b64 = data.data?.[0]?.b64_json;
-      if (!b64) throw new Error('No image data returned from OpenAI');
+      const imageUrl = data.data?.[0]?.url;
+      if (!imageUrl) throw new Error('No image URL returned from OpenAI');
+
+      // Fetch the image and convert to base64
+      const imageRes = await fetch(imageUrl);
+      if (!imageRes.ok) throw new Error('Failed to fetch generated image from OpenAI URL');
+      const arrayBuffer = await imageRes.arrayBuffer();
+      
+      let binary = '';
+      const bytes = new Uint8Array(arrayBuffer);
+      const len = bytes.byteLength;
+      for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+      }
+      const b64 = btoa(binary);
 
       // Return the data in the exact same format that the frontend (AI.tsx) expects for Gemini
       const fakeGeminiFormat = {
