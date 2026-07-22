@@ -95,15 +95,8 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      const imageUrl = data.data?.[0]?.url;
-      if (!imageUrl) throw new Error('No image URL returned from OpenAI. Response: ' + JSON.stringify(data));
-
-      // Fetch the image and convert to base64
-      const imageRes = await fetch(imageUrl);
-      if (!imageRes.ok) throw new Error('Failed to fetch generated image from OpenAI URL');
-      const arrayBuffer = await imageRes.arrayBuffer();
-      
-      const b64 = encodeBase64(arrayBuffer);
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) throw new Error('No image data returned from OpenAI. Response: ' + JSON.stringify(data));
 
       // Return the data in the exact same format that the frontend (AI.tsx) expects for Gemini
       const fakeGeminiFormat = {
