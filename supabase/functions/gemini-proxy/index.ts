@@ -1,5 +1,7 @@
 import { GoogleGenerativeAI } from 'npm:@google/generative-ai';
 import { encodeBase64 } from "jsr:@std/encoding/base64";
+import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { Image } from "https://deno.land/x/imagescript@1.2.15/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -97,17 +99,49 @@ Deno.serve(async (req) => {
       }
 
       const data = await response.json();
-      const b64 = data.data?.[0]?.b64_json;
-      if (!b64) throw new Error('No image data returned from OpenAI. Response: ' + JSON.stringify(data));
+      const imageUrl = data.data?.[0]?.url;
+      if (!imageUrl) throw new Error('No image URL returned from OpenAI. Response: ' + JSON.stringify(data));
 
-      // Return the data in the exact same format that the frontend (AI.tsx) expects for Gemini
+      // 1. Download image from OpenAI
+      const imgRes = await fetch(imageUrl);
+      const imgBuffer = await imgRes.arrayBuffer();
+
+      // 2. Compress to JPEG
+      const imageObj = await Image.decode(new Uint8Array(imgBuffer));
+      const jpegBuffer = await imageObj.encodeJPEG(80);
+
+      // 3. Upload to R2
+      const S3 = new S3Client({
+        region: "auto",
+        endpoint: Deno.env.get("R2_ENDPOINT"),
+        credentials: {
+          accessKeyId: Deno.env.get("R2_ACCESS_KEY_ID") ?? "",
+          secretAccessKey: Deno.env.get("R2_SECRET_ACCESS_KEY") ?? "",
+        },
+      });
+
+      const bucketName = Deno.env.get("R2_BUCKET_NAME");
+      const publicUrlBase = Deno.env.get("R2_PUBLIC_URL");
+      const filename = `gen_${Date.now()}.jpg`;
+
+      const command = new PutObjectCommand({
+        Bucket: bucketName,
+        Key: filename,
+        ContentType: "image/jpeg",
+        Body: jpegBuffer,
+      });
+      await S3.send(command);
+
+      const finalUrl = `${publicUrlBase}/${filename}`;
+
+      // Return the final URL in Gemini format
       const fakeGeminiFormat = {
         candidates: [{
           content: {
             parts: [{
-              inlineData: {
-                mimeType: 'image/png',
-                data: b64
+              fileData: {
+                mimeType: 'image/jpeg',
+                fileUri: finalUrl
               }
             }]
           }

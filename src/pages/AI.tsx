@@ -6,7 +6,6 @@ import { useRetailProfile } from '../components/providers/RetailProfileProvider'
 import ReactMarkdown from 'react-markdown';
 import { Menu, MessageSquare, Plus as PlusIcon, Trash2, Clock } from 'lucide-react';
 import type { Product, Customer, ChatSession, AIGeneratedImage } from '../types';
-import { uploadToR2 } from '../lib/r2Storage';
 
 type ToolType = string | null;
 
@@ -161,18 +160,6 @@ const AI = () => {
       reader.onerror = reject;
       reader.readAsDataURL(blob);
     });
-  };
-
-  const dataURLtoFile = (dataurl: string, filename: string) => {
-    const arr = dataurl.split(',');
-    const mime = arr[0].match(/:(.*?);/)?.[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new File([u8arr], filename, { type: mime });
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -375,33 +362,26 @@ const AI = () => {
           let imageGenerated = false;
           for (const candidate of data.candidates || []) {
             for (const part of (candidate.content?.parts || [])) {
-              if (part.inlineData) {
-                const dataUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-                setGeneratedImageUrl(dataUrl);
+              if (part.fileData?.fileUri) {
+                const finalUrl = part.fileData.fileUri;
+                setGeneratedImageUrl(finalUrl);
+                setShareCurrentImageUrl(finalUrl);
                 imageGenerated = true;
                 setGeneratedText("Here is your newly designed space, incorporating your selected products!");
                 
-                // Save to history and R2
+                // Save to history instantly
                 try {
-                  const filename = `gen_${Date.now()}.png`;
-                  const file = dataURLtoFile(dataUrl, filename);
-                  uploadToR2(file, filename).then((hostedUrl: string) => {
-                    if (hostedUrl) {
-                      supabase.from('ai_generated_images').insert({
-                        shop_id: shopId,
-                        generated_image_url: hostedUrl,
-                        prompt: toolPrompt
-                      }).select().single().then(({ data: newRec }) => {
-                        if (newRec) {
-                          setGeneratedImagesHistory(prev => [newRec as AIGeneratedImage, ...prev]);
-                          // Pre-populate share URL with hosted URL if they want to share immediately
-                          setShareCurrentImageUrl(hostedUrl);
-                        }
-                      });
-                    }
-                  });
-                } catch (uploadErr) {
-                  console.error("Failed to host generated image:", uploadErr);
+                  const { data: newRec } = await supabase.from('ai_generated_images').insert({
+                    shop_id: shopId,
+                    generated_image_url: finalUrl,
+                    prompt: toolPrompt
+                  }).select().single();
+                  
+                  if (newRec) {
+                    setGeneratedImagesHistory(prev => [newRec as AIGeneratedImage, ...prev]);
+                  }
+                } catch (dbErr) {
+                  console.error("Failed to save to history:", dbErr);
                 }
                 
                 break;
