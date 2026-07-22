@@ -69,15 +69,17 @@ Deno.serve(async (req) => {
       formData.append('size', '1024x1024');
 
       if (imageParts && imageParts.length > 0) {
-        const baseImage = imageParts[0].inlineData;
-        if (baseImage) {
-          const binary = atob(baseImage.data);
-          const array = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            array[i] = binary.charCodeAt(i);
+        for (let i = 0; i < imageParts.length; i++) {
+          const baseImage = imageParts[i].inlineData;
+          if (baseImage) {
+            const binary = atob(baseImage.data);
+            const array = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) {
+              array[j] = binary.charCodeAt(j);
+            }
+            const file = new File([array], `image_${i}.png`, { type: 'image/png' });
+            formData.append('image', file);
           }
-          const file = new File([array], 'image.png', { type: 'image/png' });
-          formData.append('image', file);
         }
       }
 
