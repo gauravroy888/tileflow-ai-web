@@ -22,6 +22,8 @@ import Privacy from './pages/settings/Privacy';
 import HelpCentre from './pages/HelpCentre';
 import AcceptInvite from './pages/AcceptInvite';
 
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
+
 function AuthenticatedRoutes() {
   const { shop, loading, refreshProfile } = useRetailProfile();
 
@@ -36,8 +38,9 @@ function AuthenticatedRoutes() {
   const onboardingCompleted = shop?.onboarding_completed || false;
 
   return (
-    <Routes>
-      <Route path="/onboarding" element={<Onboarding onComplete={refreshProfile} />} />
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/onboarding" element={<Onboarding onComplete={refreshProfile} />} />
       
       {/* Protected Routes */}
       <Route path="/" element={
@@ -58,6 +61,7 @@ function AuthenticatedRoutes() {
       
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </ErrorBoundary>
   );
 }
 
@@ -90,8 +94,10 @@ function App() {
   }
 
   // Always allow the accept-invite route — the user arrives from a magic link
-  // and may or may not have an active session yet when the page first loads.
-  if (typeof window !== 'undefined' && window.location.pathname.includes('/accept-invite')) {
+  // MED-09: Use exact path matching to prevent URL bypasses like /hacker/accept-invite-bypass
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname.replace(/\/$/, '') : '';
+  const isInvitePath = currentPath === '/accept-invite' || currentPath.endsWith('/accept-invite');
+  if (isInvitePath) {
     return (
       <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>

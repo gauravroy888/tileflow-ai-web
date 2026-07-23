@@ -41,13 +41,15 @@ export function useDashboardCharts(shopId: string | undefined) {
       const trendData = Object.values(dailyStats);
 
       // 2. Fetch Top Selling Products
-      // A simple client-side aggregation based on won quotes
+      // MED-06: Join query to prevent N+1 query URL length explosion
       const { data: wonQuotes, error: topError } = await supabase
         .from('quotes')
         .select('id')
         .eq('shop_id', shopId)
         .eq('status', 'won')
-        .gte('created_at', thirtyDaysAgo);
+        .gte('created_at', thirtyDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(100);
 
       if (topError) throw topError;
 

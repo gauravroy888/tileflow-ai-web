@@ -79,9 +79,19 @@ serve(async (req) => {
     const publicUrlBase = Deno.env.get("R2_PUBLIC_URL");
 
     // 4. Generate Presigned URL
+    // CRIT-05: Sanitize filename — strip path traversal chars, force safe prefix
+    const rawName = filename as string;
+    const safeName = rawName
+      .replace(/[^a-zA-Z0-9._-]/g, '_')  // Only allow safe chars
+      .replace(/\.{2,}/g, '_')            // Block ../
+      .substring(0, 200);                 // Max length
+
+    // Always prefix uploads with 'uploads/' to sandbox in a safe directory
+    const safeKey = `uploads/${safeName}`;
+
     const command = new PutObjectCommand({
       Bucket: bucketName,
-      Key: filename,
+      Key: safeKey,
       ContentType: contentType,
     });
 
@@ -91,7 +101,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         signedUrl,
-        publicUrl: `${publicUrlBase}/${filename}`,
+        publicUrl: `${publicUrlBase}/${safeKey}`,
       }),
       { headers: { "Content-Type": "application/json", ...corsHeaders } }
     );

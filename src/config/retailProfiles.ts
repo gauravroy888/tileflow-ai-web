@@ -15,7 +15,7 @@ export type ModuleId =
 export type ProductFieldSchema = {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'boolean';
+  type: 'text' | 'number' | 'select' | 'boolean' | 'textarea';
   options?: string[]; // For select type
 };
 
@@ -26,7 +26,7 @@ export type AIFeature = {
   type: 'chat' | 'vision_with_image' | 'vision_no_image' | 'image_generation';
   title: string;
   description: string;
-  icon: any;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   color: string;
   isHero?: boolean;
   systemPrompt: string;
@@ -68,7 +68,7 @@ export interface RetailProfile {
   productFieldSchema: {
     key: string;
     label: string;
-    type: 'text' | 'number' | 'boolean' | 'date' | 'select';
+    type: 'text' | 'number' | 'boolean' | 'date' | 'select' | 'textarea';
     options?: string[];
   }[];
   calculatorKey: 'area_wastage' | 'generic' | 'service_booking' | 'delivery_installation';
@@ -305,7 +305,7 @@ const pharmacyFeatures: AIFeature[] = [
     color: 'bg-primary text-background',
     isHero: true,
     buttonText: 'Scan Prescription',
-    systemPrompt: 'You are an expert pharmacist AI. The user has uploaded an image of a handwritten medical prescription. Transcribe the medicines written on it accurately. Then, match those medicines to common stock availability. Format the output clearly. Instructions from user: "{prompt}"'
+    systemPrompt: 'You are an expert pharmacist AI. The user has uploaded an image of a handwritten medical prescription. Transcribe the medicines written on it accurately. Then, match those medicines to common stock availability. Format the output clearly. Instructions from user: "{prompt}".\n\nDISCLAIMER MANDATE: Always append this exact statement at the bottom: "\n\n*Medical Disclaimer: This AI analysis is for store inventory matching only. Always verify prescription details with a licensed pharmacist before dispensing.*"'
   },
   {
     id: 'chat',
@@ -323,7 +323,7 @@ const pharmacyFeatures: AIFeature[] = [
     description: 'Check for drug interactions',
     icon: AlertTriangle,
     color: 'bg-[#F3EBFA] text-[#7D3FB5]',
-    systemPrompt: 'You are an expert clinical pharmacist. The user will provide a list of medications: "{prompt}". Analyze them and provide a concise report on any potential drug-drug interactions, contraindications, or severe side effects. Highlight any severe warnings.'
+    systemPrompt: 'You are an expert clinical pharmacist. The user will provide a list of medications: "{prompt}". Analyze them and provide a concise report on potential drug interactions or warnings.\n\nDISCLAIMER MANDATE: Always append this exact statement at the bottom: "\n\n*Medical Disclaimer: This report is for general reference only. Consult a licensed pharmacist or physician for clinical drug decisions.*"'
   },
   {
     id: 'substitute',
@@ -332,7 +332,7 @@ const pharmacyFeatures: AIFeature[] = [
     description: 'Find chemical equivalents',
     icon: Pill,
     color: 'bg-[#F8ECD5] text-[#B86D13]',
-    systemPrompt: 'You are an expert pharmacist. The user is asking for a generic substitute or alternative for a specific branded medicine: "{prompt}". State the active chemical ingredients and provide 2-3 common generic alternatives that have the exact same composition.'
+    systemPrompt: 'You are an expert pharmacist. The user is asking for a generic substitute for a specific medicine: "{prompt}". State the active chemical ingredients and 2-3 generic alternatives.\n\nDISCLAIMER MANDATE: Always append this exact statement at the bottom: "\n\n*Medical Disclaimer: Substitution suggestions must be verified and approved by a licensed pharmacist before dispensing.*"'
   }
 ];
 
@@ -389,7 +389,13 @@ export const retailProfiles: Record<string, RetailProfile> = {
       customerVisit: 'Visit',
       metrics: { total: 'Total Quotes', active: 'Active Leads', pending: 'Recent Sales' }
     },
-    productFieldSchema: [],
+    productFieldSchema: [
+      { key: 'material', label: 'Material', type: 'text' },
+      { key: 'dimension_unit', label: 'Unit', type: 'select', options: ['mm', 'cm', 'inches', 'feet', 'meters'] },
+      { key: 'length', label: 'Length', type: 'number' },
+      { key: 'width', label: 'Width', type: 'number' },
+      { key: 'height', label: 'Height', type: 'number' },
+    ],
     calculatorKey: 'generic',
     aiProfileKey: 'generic_retail',
     aiFeatures: defaultShowroomFeatures,
@@ -450,7 +456,12 @@ export const retailProfiles: Record<string, RetailProfile> = {
     },
     productFieldSchema: [
       { key: 'finish', label: 'Finish', type: 'text' },
+      { key: 'material', label: 'Material', type: 'text' },
       { key: 'collection', label: 'Collection', type: 'text' },
+      { key: 'dimension_unit', label: 'Unit', type: 'select', options: ['mm', 'cm', 'inches', 'feet', 'meters'] },
+      { key: 'length', label: 'Length', type: 'number' },
+      { key: 'width', label: 'Width', type: 'number' },
+      { key: 'height', label: 'Height', type: 'number' },
     ],
     calculatorKey: 'generic',
     aiProfileKey: 'bathware',

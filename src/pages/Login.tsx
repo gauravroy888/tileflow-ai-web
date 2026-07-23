@@ -43,7 +43,8 @@ const Login = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.href,
+          // HIGH-05: Use fixed origin, never redirect to arbitrary URL from current location
+          redirectTo: `${window.location.origin}/`,
         }
       });
       if (error) setError(error.message);
@@ -160,12 +161,15 @@ const Login = () => {
                 id="password"
                 name="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                minLength={isSignUp ? 6 : undefined}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                placeholder={isSignUp ? 'At least 6 characters' : ''}
                 className="block min-h-[48px] w-full rounded-xl border border-border bg-background px-3 py-2.5 text-textPrimary shadow-sm outline-none placeholder:text-gray-400 focus:border-primary focus:ring-2 focus:ring-primary/15 sm:text-sm"
               />
+              {isSignUp && <p className="mt-1 text-xs text-textSecondary">Password must be at least 6 characters long.</p>}
             </div>
           </div>
 

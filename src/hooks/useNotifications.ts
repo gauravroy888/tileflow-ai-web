@@ -32,9 +32,10 @@ export function useNotifications(shopId: string | undefined) {
     
     fetchNotifications();
 
-    // Subscribe to real-time changes
+    // MED-05: Use safe channel name without colon/equals special chars
+    const safeChannelId = `notifications-${shopId.replace(/[^a-zA-Z0-9-]/g, '')}`;
     const channel = supabase
-      .channel(`notifications:shop_id=eq.${shopId}`)
+      .channel(safeChannelId)
       .on(
         'postgres_changes',
         {
@@ -44,7 +45,7 @@ export function useNotifications(shopId: string | undefined) {
           filter: `shop_id=eq.${shopId}`,
         },
         () => {
-          fetchNotifications(); // Simply refetch to keep it robust and sorted
+          fetchNotifications(); // Refetch to keep sorted
         }
       )
       .subscribe();
@@ -57,28 +58,47 @@ export function useNotifications(shopId: string | undefined) {
   const markAllAsRead = async () => {
     if (!shopId || unreadCount === 0) return;
 
+    const previousNotifications = [...notifications];
+    const previousUnreadCount = unreadCount;
     const unreadIds = notifications.filter(n => !n.is_read).map(n => n.id);
     
     // Optimistic UI update
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     setUnreadCount(0);
 
-    await supabase
+    // LOW-09: Rollback on failure
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .in('id', unreadIds);
+
+    if (error) {
+      console.error('Failed to mark all notifications as read:', error);
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+    }
   };
 
   const markAsRead = async (id: string) => {
     if (!shopId) return;
 
+    const previousNotifications = [...notifications];
+    const previousUnreadCount = unreadCount;
+
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     setUnreadCount(prev => Math.max(0, prev - 1));
 
-    await supabase
+    // LOW-09: Rollback on failure
+    const { error } = await supabase
       .from('notifications')
       .update({ is_read: true })
       .eq('id', id);
+
+    if (error) {
+      console.error('Failed to mark notification as read:', error);
+      setNotifications(previousNotifications);
+      setUnreadCount(previousUnreadCount);
+    }
   };
 
   return {

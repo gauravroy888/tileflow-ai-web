@@ -83,6 +83,11 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ produc
             <div>
               <h1 className="text-2xl font-black text-textPrimary">{product.name}</h1>
               <p className="text-xl font-bold text-primary mt-1">{formatRupee(product.price)}</p>
+              {((product as any).description || product.attributes?.description) && (
+                <p className="mt-4 text-textSecondary whitespace-pre-wrap leading-relaxed">
+                  {(product as any).description || product.attributes?.description}
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -113,16 +118,16 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({ produc
                 const val = (product as any)[field.key] || (product.attributes && product.attributes[field.key]);
                 if (!val) return null;
                 return (
-                  <div key={field.key} className="p-4 bg-surface rounded-xl border border-border">
+                  <div key={field.key} className={`p-4 bg-surface rounded-xl border border-border ${field.type === 'textarea' ? 'col-span-2 md:col-span-4' : ''}`}>
                     <p className="text-xs font-medium text-textSecondary uppercase tracking-wider mb-1">{field.label}</p>
-                    <p className="font-semibold text-textPrimary">{val}</p>
+                    <p className="font-semibold text-textPrimary whitespace-pre-wrap">{val}</p>
                   </div>
                 );
               })}
 
               {/* Dynamic Additional Attributes from CSV/Integrations */}
               {product.attributes && Object.entries(product.attributes)
-                .filter(([key]) => !productFieldSchema.find(f => f.key === key))
+                .filter(([key]) => !productFieldSchema.find(f => f.key === key) && key !== 'description')
                 .map(([key, value]) => {
                   if (!value) return null;
                   return (

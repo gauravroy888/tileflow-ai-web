@@ -39,8 +39,14 @@ const Products = () => {
       
       const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', session.user.id).single();
       if (profile) setShopId(profile.shop_id);
+      if (!profile?.shop_id) throw new Error('Shop not found');
       
-      const { data, error } = await supabase.from('products').select('*').eq('is_archived', false).order('created_at', { ascending: false }).limit(1000);
+      // HIGH-03: Always explicitly filter by shop_id as defense-in-depth (don't rely solely on RLS)
+      const { data, error } = await supabase.from('products').select('*')
+        .eq('shop_id', profile.shop_id)
+        .eq('is_archived', false)
+        .order('created_at', { ascending: false })
+        .limit(1000);
       if (error) throw error;
       return data || [];
     }
@@ -65,7 +71,10 @@ const Products = () => {
   });
 
   const handleDeleteProduct = (id: string) => {
-    deleteProductMutation.mutate(id);
+    // MED-07: Add confirmation guard before archiving product
+    if (window.confirm('Are you sure you want to archive this product? You can restore it later if needed.')) {
+      deleteProductMutation.mutate(id);
+    }
   };
 
   const filters = useMemo(() => {

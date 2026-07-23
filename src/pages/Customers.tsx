@@ -136,9 +136,16 @@ const Customers = () => {
   const fetchCustomers = async () => {
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+      const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', session.user.id).single();
+      if (!profile?.shop_id) return;
+
+      // HIGH-03: Always explicitly filter by shop_id as defense-in-depth
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('shop_id', profile.shop_id)
         .eq('is_archived', false)
         .order('created_at', { ascending: false })
         .limit(1000);
@@ -345,7 +352,15 @@ const Customers = () => {
                   type="tel"
                   placeholder={t('customers.placeholder.phone')}
                   value={form.phone}
-                  onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                  onChange={e => {
+                    // HIGH-04: Only allow digits, spaces, +, -, ()
+                    const sanitized = e.target.value.replace(/[^0-9+\-\s()]/g, '');
+                    setForm(f => ({ ...f, phone: sanitized }));
+                  }}
+                  pattern="[+]?[0-9\s\-()]{7,15}"
+                  minLength={7}
+                  maxLength={16}
+                  title="Enter a valid phone number (7–15 digits)"
                   className="w-full border border-border rounded-xl px-3 py-2.5 bg-background text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                 />
               </div>

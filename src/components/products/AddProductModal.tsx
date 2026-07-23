@@ -114,7 +114,7 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
   // Load draft on open
   useEffect(() => {
     if (isOpen && !productToEdit && shopId) {
-      const saved = localStorage.getItem(`retailflow_draft_product_${shopId}`);
+      const saved = sessionStorage.getItem(`retailflow_draft_product_${shopId}`);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -132,7 +132,7 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
   useEffect(() => {
     if (isOpen && !productToEdit && shopId) {
       const timeout = setTimeout(() => {
-        localStorage.setItem(`retailflow_draft_product_${shopId}`, JSON.stringify(formData));
+        sessionStorage.setItem(`retailflow_draft_product_${shopId}`, JSON.stringify(formData));
       }, 500);
       return () => clearTimeout(timeout);
     }
@@ -206,7 +206,13 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
         brand: formData.brand || null,
         sku: formData.sku || null,
         category: formData.category || null,
-        price: parseFloat(formData.price) || 0,
+        price: (() => {
+          const p = parseFloat(formData.price);
+          if (isNaN(p) || p < 0) {
+            throw new Error('Please enter a valid non-negative price');
+          }
+          return p;
+        })(),
         stock_status: formData.stock_status || 'in_stock',
         image_url: imageUrl,
         images: uploadedUrls,
@@ -248,7 +254,7 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
         if (insertError) throw insertError;
         
         // Clear draft on successful insert
-        localStorage.removeItem(`retailflow_draft_product_${shopId}`);
+        sessionStorage.removeItem(`retailflow_draft_product_${shopId}`);
       }
 
       onProductAdded();
@@ -267,8 +273,9 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   return (
@@ -358,9 +365,13 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
                 <label className="block text-sm font-medium text-textSecondary">Name *</label>
                 <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Product Name" />
               </div>
+              <div className="space-y-2 md:col-span-2">
+                <label className="block text-sm font-medium text-textSecondary">Description</label>
+                <textarea name="description" value={formData.description || ''} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]" placeholder="e.g. Description" />
+              </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-textSecondary">Price (₹) *</label>
-                <input required type="number" step="0.01" name="price" value={formData.price} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
+                <input required type="number" step="0.01" min="0" name="price" value={formData.price} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="0.00" />
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-textSecondary">Availability</label>
@@ -386,9 +397,17 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
               
               {/* Dynamic Profile Fields */}
               {productFieldSchema.map((field) => (
-                <div className="space-y-2" key={field.key}>
+                <div className={`space-y-2 ${field.type === 'textarea' ? 'md:col-span-2' : ''}`} key={field.key}>
                   <label className="block text-sm font-medium text-textSecondary">{field.label}</label>
-                  {field.type === 'select' ? (
+                  {field.type === 'textarea' ? (
+                    <textarea
+                      name={field.key}
+                      value={(formData as any)[field.key] || ''}
+                      onChange={handleChange}
+                      className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary min-h-[100px]"
+                      placeholder={`e.g. ${field.label}`}
+                    />
+                  ) : field.type === 'select' ? (
                     <select 
                       name={field.key} 
                       value={(formData as any)[field.key] || ''} 

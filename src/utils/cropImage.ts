@@ -4,6 +4,13 @@ export const getCroppedImg = async (
   maxSize: number = 1000
 ): Promise<File> => {
   const image = await createImage(imageSrc);
+
+  // MED-10: Max dimension check to prevent Canvas RAM exhaustion (JPEG bomb guard)
+  const MAX_DIMENSION = 8000;
+  if (image.naturalWidth > MAX_DIMENSION || image.naturalHeight > MAX_DIMENSION) {
+    throw new Error(`Image dimensions (${image.naturalWidth}x${image.naturalHeight}) are too large. Maximum supported is ${MAX_DIMENSION}x${MAX_DIMENSION}.`);
+  }
+
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
 
@@ -25,8 +32,8 @@ export const getCroppedImg = async (
     }
   }
 
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
+  canvas.width = Math.max(1, Math.round(targetWidth));
+  canvas.height = Math.max(1, Math.round(targetHeight));
 
   ctx.drawImage(
     image,
@@ -43,7 +50,6 @@ export const getCroppedImg = async (
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
       if (blob) {
-        // Convert Blob to File
         const file = new File([blob], 'cropped.png', { type: 'image/png' });
         resolve(file);
       } else {

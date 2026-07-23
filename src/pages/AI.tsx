@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import ReactMarkdown from 'react-markdown';
 import { Menu, MessageSquare, Plus as PlusIcon, Trash2, Clock } from 'lucide-react';
+import { toast } from 'react-hot-toast';
 import type { Product, Customer, ChatSession, AIGeneratedImage } from '../types';
 
 type ToolType = string | null;
@@ -76,7 +77,9 @@ const AI = () => {
           .from('products')
           .select('*')
           .eq('shop_id', profile.shop_id)
-          .order('created_at', { ascending: false });
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false })
+          .limit(100);
           
         if (products) setShopProducts(products as Product[]);
         
@@ -84,7 +87,9 @@ const AI = () => {
           .from('customers')
           .select('*')
           .eq('shop_id', profile.shop_id)
-          .order('created_at', { ascending: false });
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false })
+          .limit(100);
           
         if (customers) setShopCustomers(customers as Customer[]);
 
@@ -146,6 +151,22 @@ const AI = () => {
   };
 
   const getBase64FromUrl = async (url: string): Promise<string> => {
+    // HIGH-02: Validate URL to prevent SSRF — only allow HTTPS URLs to external hosts
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'https:') {
+        throw new Error(`Blocked non-HTTPS image URL: ${url}`);
+      }
+      // Block internal/metadata IP ranges
+      const blocked = ['169.254.', '10.', '192.168.', '172.16.', 'localhost', '127.'];
+      if (blocked.some(b => parsed.hostname.startsWith(b))) {
+        throw new Error(`Blocked internal image URL: ${url}`);
+      }
+    } catch (e: any) {
+      if (e.message?.startsWith('Blocked')) throw e;
+      throw new Error(`Invalid image URL: ${url}`);
+    }
+
     const response = await fetch(url);
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
@@ -178,10 +199,16 @@ const AI = () => {
       }));
 
       let promptToSend = userMsg;
-      if (messages.length === 0) {
-        const contextStr = `[SYSTEM CONTEXT: You are the AI Assistant for this retail store. You have access to the store's data below to help the owner. Do not reveal this raw data directly to the user unless asked, but use it to answer their questions accurately (e.g. "Who are my latest customers?", "What products do I have?", "Who needs Product X?").\n\n=== INVENTORY ===\n${shopProducts.map(p => `- ${p.name} (Price: ${p.price}, Category: ${p.category || 'N/A'})`).join('\n')}\n\n=== CUSTOMERS ===\n${shopCustomers.map(c => `- ${c.name} (Phone: ${c.phone}, Budget: ${c.budget}, Needs: ${c.required_products || 'None'}, Status: ${c.visit_status}, Date: ${new Date(c.created_at).toLocaleDateString()})`).join('\n')}\n]\n\n`;
-        promptToSend = contextStr + userMsg;
-      }
+
+      const systemContext = `You are an expert AI retail assistant for this store owner. You have full, direct access to the live store database context below. ALWAYS use this real data to answer questions directly (e.g. "give me an update for today", "show my inventory", "who are my customers"). Never claim you don't have access to their store data.
+
+=== LIVE STORE INVENTORY (${shopProducts.length} Products) ===
+${shopProducts.length > 0 ? shopProducts.map(p => `- Product: ${p.name} | Price: ₹${p.price} | Category: ${p.category || 'N/A'} | Brand: ${p.brand || 'N/A'} | Stock: ${p.stock_status}`).join('\n') : 'No products added to catalogue yet.'}
+
+=== LIVE CUSTOMER RECORDS (${shopCustomers.length} Customers) ===
+${shopCustomers.length > 0 ? shopCustomers.map(c => `- Name: ${c.name} | Status: ${c.visit_status} | Budget: ₹${c.budget || 'N/A'} | Required: ${c.required_products || 'N/A'} | Phone: ${c.phone || 'N/A'}`).join('\n') : 'No customer records added yet.'}
+
+Give helpful, executive summaries and actionable advice based on this exact data.`;
 
       let sessionId = currentSessionId;
       if (!sessionId && shopId) {
@@ -218,7 +245,7 @@ const AI = () => {
           action: 'chat',
           prompt: promptToSend, 
           history,
-          systemInstruction: "You are a helpful AI assistant for retail store owners..."
+          systemInstruction: systemContext
         }
       });
 
@@ -275,26 +302,112 @@ const AI = () => {
 
       if (['vision_with_image', 'image_generation'].includes(activeFeature.type) && uploadedImage) {
         const base64Data = uploadedImage.split(',')[1];
+        imageParts.push({ text: "Client's provided room image:" });
         imageParts.push({ inlineData: { mimeType: uploadedImageMime, data: base64Data } });
       }
 
       if (selectedProducts.length > 0) {
-        prompt += `\n\nCRITICAL: Incorporate these exact products into the space:\n`;
-        selectedProducts.forEach((p, index) => {
-          prompt += `${index + 1}. ${p.name} (Category: ${p.category || 'N/A'}, Color: ${p.color || 'N/A'}, Material: ${p.material || 'N/A'})\n`;
-        });
-        
-        for (const product of selectedProducts) {
-          if (product.image_url) {
-            try {
-              const base64DataUrl = await getBase64FromUrl(product.image_url);
-              const match = base64DataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,([^"]*)$/);
-              if (match) {
-                 imageParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+        if (['vision_with_image', 'image_generation'].includes(activeFeature.type)) {
+          setLoadingStatus('Enhancing prompt with product details...');
+          try {
+            const productDetails = selectedProducts.map((p, idx) => {
+              const l = p.attributes?.length;
+              const w = p.attributes?.width;
+              const h = p.attributes?.height;
+              const unit = p.attributes?.dimension_unit || '';
+              const dims = (l && w && h) ? `${l}x${w}x${h} ${unit}`.trim() : p.size || 'N/A';
+              return `- Product ${idx + 1}: ${p.name} (Brand: ${p.brand || 'N/A'}, Category: ${p.category || 'N/A'}, Dimensions: ${dims}, Thickness: ${p.thickness ? p.thickness+'mm' : 'N/A'}, Material: ${p.material || 'N/A'}, Finish: ${p.finish || 'N/A'}, Color: ${p.color || 'N/A'}, Texture: ${p.texture || 'N/A'})`;
+            }).join('\n');
+            
+            const enrichmentPrompt = `You are an expert interior design AI prompt engineer. 
+The user wants to generate or modify an image with this base instruction: "${toolPrompt}".
+They want to incorporate the following exact real-world product(s) from their inventory into the scene:
+${productDetails}
+
+CRITICAL VISUAL REPLICATION INSTRUCTIONS:
+Carefully analyze the attached Product Reference Images and describe their exact 3D geometry so the image generator replicates the physical product EXACTLY instead of using a generic model:
+1. EXACT SHAPE: Is it capsule/pill-shaped (straight parallel sides with semi-circular ends), rectangular, or flared boat-shaped? State the exact silhouette.
+2. SIDE WALLS & RIMS: Describe the wall angles (e.g. "perfectly straight vertical side walls" vs "curved sloping flared walls") and rim thickness.
+3. BASE & FLOOR PLACEMENT: State exactly how it sits on the ground (e.g. "sits completely flat and flush on the floor; DO NOT place on a raised pedestal, platform, or step").
+4. NEGATIVE CONSTRAINTS: Explicitly prohibit common generic defaults that don't match the image (e.g. "Do not add a raised circular platform or pedestal beneath the tub").
+
+Write a highly detailed, visually descriptive prompt for an image generation model that forces it to replicate these exact physical and geometric characteristics. Return ONLY the final prompt string without any conversational text or quotes.`;
+
+            let pIndex = 1;
+            for (const product of selectedProducts) {
+              const imagesToUse = [];
+              if (selectedProducts.length === 1 && product.images && product.images.length > 0) {
+                // If only 1 product is selected, use up to 3 of its images for better accuracy
+                imagesToUse.push(...product.images.slice(0, 3));
+              } else if (product.image_url) {
+                // Otherwise just use the main image
+                imagesToUse.push(product.image_url);
               }
-            } catch (err) {
-               console.error("Failed to load product image", err);
+
+              for (let i = 0; i < imagesToUse.length; i++) {
+                try {
+                  const base64DataUrl = await getBase64FromUrl(imagesToUse[i]);
+                  const match = base64DataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,([^"]*)$/);
+                  if (match) {
+                     const label = selectedProducts.length === 1 ? `Product ${pIndex} (Reference Image ${i + 1}):` : `Product ${pIndex} image:`;
+                     imageParts.push({ text: label });
+                     imageParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                  }
+                } catch (err) {
+                   console.error("Failed to load product image", err);
+                }
+              }
+              pIndex++;
             }
+
+            const { data: enrichmentData, error: enrichmentError } = await supabase.functions.invoke('gemini-proxy', {
+              body: {
+                action: 'vision',
+                parts: [{ text: enrichmentPrompt }],
+                imageParts: imageParts
+              }
+            });
+
+            if (enrichmentError) throw enrichmentError;
+            prompt = enrichmentData.text;
+          } catch (enrichErr) {
+            console.error("Failed to enrich prompt, falling back to basic prompt:", enrichErr);
+            prompt += `\n\nCRITICAL: Incorporate these exact products into the space:\n`;
+            selectedProducts.forEach((p, index) => {
+              prompt += `${index + 1}. ${p.name} (Category: ${p.category || 'N/A'}, Color: ${p.color || 'N/A'}, Material: ${p.material || 'N/A'}, Finish: ${p.finish || 'N/A'}, Size: ${p.size || 'N/A'})\n`;
+            });
+          }
+        } else {
+          prompt += `\n\nCRITICAL: Incorporate these exact products into the space:\n`;
+          selectedProducts.forEach((p, index) => {
+            prompt += `${index + 1}. ${p.name} (Category: ${p.category || 'N/A'}, Color: ${p.color || 'N/A'}, Material: ${p.material || 'N/A'}, Finish: ${p.finish || 'N/A'}, Size: ${p.size || 'N/A'})\n`;
+          });
+          
+          let pIndex = 1;
+          for (const product of selectedProducts) {
+            const imagesToUse = [];
+            if (selectedProducts.length === 1 && product.images && product.images.length > 0) {
+              // If only 1 product is selected, use up to 3 of its images for better accuracy
+              imagesToUse.push(...product.images.slice(0, 3));
+            } else if (product.image_url) {
+              // Otherwise just use the main image
+              imagesToUse.push(product.image_url);
+            }
+
+            for (let i = 0; i < imagesToUse.length; i++) {
+              try {
+                const base64DataUrl = await getBase64FromUrl(imagesToUse[i]);
+                const match = base64DataUrl.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,([^"]*)$/);
+                if (match) {
+                   const label = selectedProducts.length === 1 ? `Product ${pIndex} (Reference Image ${i + 1}):` : `Product ${pIndex} image:`;
+                   imageParts.push({ text: label });
+                   imageParts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+                }
+              } catch (err) {
+                 console.error("Failed to load product image", err);
+              }
+            }
+            pIndex++;
           }
         }
       }
@@ -317,30 +430,13 @@ const AI = () => {
         // This is an image generation/editing task. Go straight to the image proxy.
         setLoadingStatus('Generating image with OpenAI...');
         try {
-          const { data: authData } = await supabase.auth.getSession();
-          const userId = authData?.session?.user?.id;
-          
-          if (!userId) throw new Error("Not authenticated");
-
-          // Check Rate Limit by inserting log
-          const { error: usageError } = await supabase.from('ai_usage_logs').insert({
-            shop_id: shopId,
-            user_id: userId,
-            action_type: 'image_generation'
-          });
-
-          if (usageError) {
-            if (usageError.message.includes('RATE_LIMIT_AI_IMAGE')) {
-              throw new Error('Daily AI image limit reached (50 images/day). Please try again tomorrow.');
-            }
-            throw usageError;
-          }
-
+          // CRIT-03: Rate limiting is now enforced server-side inside gemini-proxy.
+          // No client-side insert needed — the Edge Function handles it.
           const { data, error } = await supabase.functions.invoke('gemini-proxy', {
             body: {
               action: 'generateImage',
               parts: parts,
-              imageParts: imageParts // Pass the base image and product images directly to OpenAI
+              imageParts: imageParts
             }
           });
 
@@ -395,12 +491,12 @@ const AI = () => {
           }
         } catch (imgErr: any) {
           console.error('OpenAI Image Generation Error:', imgErr);
-          alert('Image Generation failed:\n\n' + (imgErr.message || 'Unknown error') + '\n\nCheck console for details.');
+          toast.error('Image Generation failed: ' + (imgErr.message || 'Unknown error'));
         }
       }
     } catch (error: any) {
       console.error(error);
-      alert('Error: ' + (error.message || 'Something went wrong'));
+      toast.error('Error: ' + (error.message || 'Something went wrong'));
     } finally {
       setLoadingTool(false);
     }
@@ -565,6 +661,7 @@ const AI = () => {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       placeholder="Ask about your business..."
+                      maxLength={1000}
                       className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm text-textPrimary outline-none placeholder:text-textSecondary"
                       disabled={loadingChat}
                     />
@@ -625,7 +722,7 @@ const AI = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-textPrimary mb-2">Attach from Inventory (Up to 5)</label>
+                  <label className="block text-sm font-medium text-textPrimary mb-2">Attach from Inventory (Up to 3)</label>
                   <div className="flex items-center gap-3 overflow-x-auto pb-2">
                     {selectedProducts.map(p => (
                       <div key={p.id} className="relative w-20 h-20 rounded-xl bg-sand shrink-0 border border-border">
@@ -639,7 +736,7 @@ const AI = () => {
                          </button>
                       </div>
                     ))}
-                    {selectedProducts.length < 5 && (
+                    {selectedProducts.length < 3 && (
                       <button onClick={() => setIsPickerOpen(true)} className="flex flex-col items-center justify-center px-4 py-2 h-20 bg-surface border-2 border-dashed border-border rounded-xl text-textSecondary font-medium hover:bg-sand/50 hover:border-primary hover:text-primary transition-colors shrink-0">
                         <Plus size={20} className="mb-1" />
                         <span className="text-[10px] whitespace-nowrap">Add Item</span>
@@ -722,7 +819,7 @@ const AI = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
           <div className="bg-surface w-full max-w-2xl rounded-2xl shadow-xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
-              <h3 className="font-bold text-lg">Select Products ({selectedProducts.length}/5)</h3>
+              <h3 className="font-bold text-lg">Select Products ({selectedProducts.length}/3)</h3>
               <button onClick={() => setIsPickerOpen(false)} className="text-gray-500 hover:bg-gray-100 p-2 rounded-full transition-colors">
                 <X size={20} />
               </button>
@@ -740,7 +837,7 @@ const AI = () => {
                         onClick={() => {
                           if (isSelected) {
                             setSelectedProducts(prev => prev.filter(sp => sp.id !== p.id));
-                          } else if (selectedProducts.length < 5) {
+                          } else if (selectedProducts.length < 3) {
                             setSelectedProducts(prev => [...prev, p]);
                           }
                         }}
@@ -894,7 +991,7 @@ const AI = () => {
                        className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-sand transition-colors text-left"
                        onClick={() => {
                          if (!shareCurrentImageUrl) {
-                            alert("Image is still being uploaded to the server. Please try sharing again in a few seconds.");
+                            toast.error("Image is still uploading. Please try sharing in a few seconds.");
                             return;
                          }
                          const text = `Hi ${c.name}, I wanted to share this new design concept we created for you! Check it out here: ${shareCurrentImageUrl}`;
