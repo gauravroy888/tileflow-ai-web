@@ -158,7 +158,7 @@ const Onboarding = ({ onComplete }: OnboardingProps) => {
       <div className="mt-10 sm:mx-auto sm:w-full sm:max-w-md bg-surface px-6 py-8 shadow-sm rounded-lg border border-border">
         {step === 1 && (
           <div className="space-y-4">
-            <h3 className="text-lg font-bold text-textPrimary">1. Choose showroom</h3>
+            <h3 className="text-lg font-bold text-textPrimary">1. Choose business type</h3>
             <p className="text-sm text-textSecondary">Select your primary business category.</p>
             <div className="grid grid-cols-1 gap-3 mt-4">
               {Object.values(retailProfiles).filter(p => p.id !== 'showroom').map(p => (

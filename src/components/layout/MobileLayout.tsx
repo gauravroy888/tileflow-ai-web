@@ -20,7 +20,7 @@ const iconMap: Record<string, any> = {
 
 const MobileLayout = () => {
   const { t, i18n } = useTranslation();
-  const { shop, profile } = useRetailProfile();
+  const { shop, profile, labels } = useRetailProfile();
   
   const { notifications, unreadCount, markAllAsRead, markAsRead } = useNotifications(shop?.id);
 
@@ -35,7 +35,7 @@ const MobileLayout = () => {
   const navItems = [
     { name: t('nav.dashboard'), path: '/', icon: Home },
     { name: t('nav.customers'), path: '/customers', icon: UsersRound },
-    { name: t('nav.products'), path: '/products', icon: LayoutGrid },
+    { name: labels.productNavLabel || t('nav.products'), path: '/products', icon: LayoutGrid },
     { name: t('nav.ai'), path: '/ai', icon: Sparkles },
     { name: t('nav.more'), path: '/more', icon: Menu },
   ];

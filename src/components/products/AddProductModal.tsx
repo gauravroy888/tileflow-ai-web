@@ -45,7 +45,7 @@ class ErrorBoundary extends React.Component<{children: React.ReactNode}, {hasErr
 }
 
 const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose, onProductAdded, shopId, productToEdit }) => {
-  const { productFieldSchema } = useRetailProfile();
+  const { productFieldSchema, labels } = useRetailProfile();
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState<{file?: File, url: string}[]>([]);
   const [tempImagePreview, setTempImagePreview] = useState<string | null>(null);
@@ -283,7 +283,7 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
       <div className="bg-surface w-full max-w-2xl rounded-2xl shadow-xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-semibold text-textPrimary">{productToEdit ? 'Edit Product' : 'Add New Product'}</h2>
+          <h2 className="text-xl font-semibold text-textPrimary">{productToEdit ? (labels.productSingular ? `Edit ${labels.productSingular}` : 'Edit Product') : (labels.productAdd || 'Add New Product')}</h2>
           <button onClick={onClose} className="p-2 text-textSecondary hover:bg-bgSecondary rounded-full transition-colors">
             <X size={20} />
           </button>
@@ -294,7 +294,7 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
           <form id="addProductForm" onSubmit={handleSubmit} className="space-y-6">
             
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-textSecondary">Product Images (Max 3)</label>
+              <label className="block text-sm font-medium text-textSecondary">{labels.productSingular ? `${labels.productSingular} Images (Max 3)` : 'Product Images (Max 3)'}</label>
               <div className="flex items-center justify-center w-full">
                 {isCropping && tempImagePreview ? (
                   <div className="relative w-full h-[300px] bg-black rounded-xl overflow-hidden flex flex-col">
@@ -362,8 +362,8 @@ const AddProductModalInner: React.FC<AddProductModalProps> = ({ isOpen, onClose,
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Basic Info */}
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-textSecondary">Name *</label>
-                <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder="e.g. Product Name" />
+                <label className="block text-sm font-medium text-textSecondary">{labels.productSingular ? `${labels.productSingular} Name *` : 'Name *'}</label>
+                <input required type="text" name="name" value={formData.name} onChange={handleChange} className="w-full p-3 rounded-lg border border-border bg-bgSecondary text-textPrimary focus:outline-none focus:ring-2 focus:ring-primary" placeholder={labels.productSingular ? `e.g. ${labels.productSingular} Name` : 'e.g. Product Name'} />
               </div>
               <div className="space-y-2 md:col-span-2">
                 <label className="block text-sm font-medium text-textSecondary">Description</label>

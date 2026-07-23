@@ -19,7 +19,7 @@ type ProductFilter = 'all' | 'low_stock' | string;
 const Products = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { userProfile } = useRetailProfile();
+  const { userProfile, labels } = useRetailProfile();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<ProductFilter>('all');
@@ -72,7 +72,7 @@ const Products = () => {
 
   const handleDeleteProduct = (id: string) => {
     // MED-07: Add confirmation guard before archiving product
-    if (window.confirm('Are you sure you want to archive this product? You can restore it later if needed.')) {
+    if (window.confirm(`Are you sure you want to delete this ${labels.productSingular?.toLowerCase() || 'product'}?`)) {
       deleteProductMutation.mutate(id);
     }
   };
@@ -80,11 +80,11 @@ const Products = () => {
   const filters = useMemo(() => {
     const categories = [...new Set(products.map((product) => product.category).filter(Boolean))].slice(0, 3) as string[];
     return [
-      { id: 'all', label: t('products.all_items') },
+      { id: 'all', label: labels.productPlural ? `All ${labels.productPlural}` : t('products.all_items') },
       { id: 'low_stock', label: t('products.low_stock') },
       ...categories.map((category) => ({ id: category, label: category })),
     ];
-  }, [products, t]);
+  }, [products, t, labels]);
 
   const filteredProducts = products.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || Boolean(product.sku?.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -98,9 +98,9 @@ const Products = () => {
     <div className="page-shell mx-auto max-w-screen-xl space-y-5">
       <header className="flex items-end justify-between gap-3">
         <div>
-          <p className="eyebrow">{t('products.workspace')}</p>
-          <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">{t('products.title')}</h2>
-          <p className="mt-1 text-sm text-textSecondary">{products.length} {t('products.in_catalogue')}</p>
+          <p className="eyebrow">{labels.productPlural ? `${labels.productPlural} Workspace` : t('products.workspace')}</p>
+          <h2 className="mt-0.5 text-2xl font-extrabold tracking-tight text-textPrimary">{labels.productsTitle || t('products.title')}</h2>
+          <p className="mt-1 text-sm text-textSecondary">{products.length} {labels.productPlural ? `in ${labels.productPlural.toLowerCase()} catalogue` : t('products.in_catalogue')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="shrink-0 gap-1.5" onClick={() => exportProductsToCSV(products)}>
@@ -115,7 +115,7 @@ const Products = () => {
             setIsImporting(true);
             try {
               const count = await importProductsFromCSV(file, shopId);
-              toast.success(`Imported ${count} products successfully!`);
+              toast.success(`Imported ${count} ${labels.productPlural?.toLowerCase() || 'products'} successfully!`);
               queryClient.invalidateQueries({ queryKey: ['products'] });
             } catch (err: any) {
               toast.error('Import failed: ' + err.message);
@@ -125,7 +125,7 @@ const Products = () => {
             }
           }} />
           <Button size="sm" className="shrink-0 gap-1.5" onClick={() => { setProductToEdit(null); setIsAddModalOpen(true); }}>
-            <Plus size={18} /> {t('products.add_new')}
+            <Plus size={18} /> {labels.productAdd || t('products.add_new')}
           </Button>
         </div>
       </header>

@@ -58,6 +58,10 @@ export interface RetailProfile {
   copy: {
     dashboardTitle: string;
     productAdd: string;
+    productNavLabel?: string;
+    productSingular?: string;
+    productPlural?: string;
+    productsTitle?: string;
     customerVisit: string;
     metrics: {
       total: string;
@@ -532,18 +536,22 @@ export const retailProfiles: Record<string, RetailProfile> = {
   },
   salon: {
     id: 'salon',
-    displayName: 'Salon / Tailoring',
+    displayName: 'Service Business (Salon & Tailoring)',
     recommendedModules: ['service'],
     iconKey: 'scissors',
     copy: {
-      dashboardTitle: 'Salon Dashboard',
+      dashboardTitle: 'Salon & Tailoring Dashboard',
       productAdd: 'Add Service',
+      productNavLabel: 'Services',
+      productSingular: 'Service',
+      productPlural: 'Services',
+      productsTitle: 'Services Catalogue',
       customerVisit: 'Appointment',
       metrics: { total: 'Today\'s Appointments', active: 'Active Clients', pending: 'Completed Services' }
     },
     productFieldSchema: [
       { key: 'duration', label: 'Duration (Mins)', type: 'number' },
-      { key: 'category', label: 'Category', type: 'select', options: ['Hair', 'Nails', 'Spa', 'Alteration', 'Tailoring'] }
+      { key: 'category', label: 'Category', type: 'select', options: ['Hair', 'Nails', 'Alteration', 'Tailoring'] }
     ],
     calculatorKey: 'service_booking',
     aiProfileKey: 'salon',
