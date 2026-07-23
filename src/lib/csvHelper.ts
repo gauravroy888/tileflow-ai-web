@@ -31,6 +31,59 @@ export const importProductsFromCSV = async (file: File, shopId: string): Promise
   return handleCsvImport(file, shopId);
 };
 
+const saveImportedProducts = async (newProducts: any[], shopId: string): Promise<number> => {
+  if (newProducts.length === 0) return 0;
+
+  // Fetch existing products for shop (including archived items)
+  const { data: existingProducts } = await supabase
+    .from('products')
+    .select('id, sku, name')
+    .eq('shop_id', shopId);
+
+  const existingMap = new Map<string, string>();
+  if (existingProducts) {
+    for (const p of existingProducts) {
+      if (p.sku) existingMap.set(`sku:${p.sku.toLowerCase().trim()}`, p.id);
+      if (p.name) existingMap.set(`name:${p.name.toLowerCase().trim()}`, p.id);
+    }
+  }
+
+  const toUpdate: any[] = [];
+  const toInsert: any[] = [];
+
+  for (const prod of newProducts) {
+    const skuKey = prod.sku ? `sku:${prod.sku.toLowerCase().trim()}` : null;
+    const nameKey = prod.name ? `name:${prod.name.toLowerCase().trim()}` : null;
+    
+    const existingId = (skuKey && existingMap.get(skuKey)) || (nameKey && existingMap.get(nameKey));
+
+    if (existingId) {
+      toUpdate.push({
+        ...prod,
+        id: existingId,
+        is_archived: false, // Automatically un-archive restored products!
+      });
+    } else {
+      toInsert.push({
+        ...prod,
+        is_archived: false,
+      });
+    }
+  }
+
+  if (toUpdate.length > 0) {
+    const { error: updateErr } = await supabase.from('products').upsert(toUpdate);
+    if (updateErr) throw updateErr;
+  }
+
+  if (toInsert.length > 0) {
+    const { error: insertErr } = await supabase.from('products').insert(toInsert);
+    if (insertErr) throw insertErr;
+  }
+
+  return toUpdate.length + toInsert.length;
+};
+
 const handleCsvImport = (file: File, shopId: string): Promise<number> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
@@ -39,11 +92,8 @@ const handleCsvImport = (file: File, shopId: string): Promise<number> => {
       complete: async (results) => {
         try {
           const newProducts = await processCsvData(results.data, shopId, null);
-          if (newProducts.length === 0) return resolve(0);
-
-          const { error } = await supabase.from('products').insert(newProducts);
-          if (error) throw error;
-          resolve(newProducts.length);
+          const count = await saveImportedProducts(newProducts, shopId);
+          resolve(count);
         } catch (error) {
           reject(error);
         }
@@ -71,12 +121,47 @@ const handleZipImport = async (file: File, shopId: string): Promise<number> => {
   const results = Papa.parse(csvText, { header: true, skipEmptyLines: true });
   
   const newProducts = await processCsvData(results.data, shopId, contents);
-  if (newProducts.length === 0) return 0;
+  return saveImportedProducts(newProducts, shopId);
+};
 
-  const { error } = await supabase.from('products').insert(newProducts);
-  if (error) throw error;
+const DEFAULT_RATES_TO_INR: Record<string, number> = {
+  USD: 86.5,
+  '$': 86.5,
+  EUR: 93.2,
+  '€': 93.2,
+  GBP: 109.5,
+  '£': 109.5,
+  CAD: 62.1,
+  AUD: 55.4,
+  AED: 23.5,
+  INR: 1.0,
+  '₹': 1.0,
+};
+
+const rateCache: Record<string, number> = {};
+
+const getRateToINR = async (currencyStr?: string): Promise<number> => {
+  if (!currencyStr) return 1.0;
+  const curr = currencyStr.toString().trim().toUpperCase();
+  if (curr === 'INR' || curr === '₹') return 1.0;
   
-  return newProducts.length;
+  if (rateCache[curr]) return rateCache[curr];
+
+  try {
+    const res = await fetch(`https://open.er-api.com/v6/latest/${curr}`);
+    const data = await res.json();
+    if (data && data.result === 'success' && data.rates && data.rates['INR']) {
+      const rate = data.rates['INR'];
+      rateCache[curr] = rate;
+      return rate;
+    }
+  } catch (err) {
+    console.warn(`Could not fetch live exchange rate for ${curr}, using preset:`, err);
+  }
+
+  const fallback = DEFAULT_RATES_TO_INR[curr] || 1.0;
+  rateCache[curr] = fallback;
+  return fallback;
 };
 
 const processCsvData = async (data: any[], shopId: string, zipContents: JSZip | null) => {
@@ -92,10 +177,11 @@ const processCsvData = async (data: any[], shopId: string, zipContents: JSZip | 
     const sku = getVal(['sku', 'ean', 'internal id', 'id']);
     const category = getVal(['category', 'type', 'department']);
     const price = getVal(['price', 'cost', 'amount']);
+    const currency = getVal(['currency', 'curr', 'price_currency', 'currency_code']);
     const stock_status = getVal(['stock_status', 'availability', 'stock']);
     let image_url = getVal(['image_url', 'image url', 'image', 'picture']);
 
-    const knownKeys = ['name', 'product name', 'title', 'sku', 'ean', 'internal id', 'id', 'category', 'type', 'department', 'price', 'cost', 'amount', 'stock_status', 'availability', 'stock', 'image', 'image_url', 'image url', 'picture', ''];
+    const knownKeys = ['name', 'product name', 'title', 'sku', 'ean', 'internal id', 'id', 'category', 'type', 'department', 'price', 'cost', 'amount', 'currency', 'curr', 'price_currency', 'currency_code', 'stock_status', 'availability', 'stock', 'image', 'image_url', 'image url', 'picture', ''];
     
     const attributes: Record<string, any> = {};
     Object.keys(row).forEach(key => {
@@ -103,6 +189,22 @@ const processCsvData = async (data: any[], shopId: string, zipContents: JSZip | 
         attributes[key] = row[key];
       }
     });
+
+    let rawPrice = parseFloat(price || '0');
+    if (isNaN(rawPrice)) rawPrice = 0;
+
+    let finalPriceInINR = rawPrice;
+    if (currency) {
+      const currStr = currency.toString().trim();
+      const rateToINR = await getRateToINR(currStr);
+      finalPriceInINR = Math.round(rawPrice * rateToINR);
+      // Store currency as INR since price has been converted to Rupees
+      attributes.currency = 'INR';
+      attributes.original_currency = currStr;
+      attributes.original_price = rawPrice;
+    } else {
+      attributes.currency = 'INR';
+    }
 
     // Check if image refers to a local file in ZIP
     if (image_url && zipContents && !image_url.startsWith('http')) {
@@ -138,7 +240,7 @@ const processCsvData = async (data: any[], shopId: string, zipContents: JSZip | 
       name: name || 'Unnamed Product',
       sku: sku || null,
       category: category || 'General',
-      price: Math.round(parseFloat(price || '0')),
+      price: finalPriceInINR,
       stock_status: stock_status || 'in_stock',
       image_url: image_url,
       attributes

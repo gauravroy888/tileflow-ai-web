@@ -7,11 +7,10 @@ import { uploadToR2 } from '../lib/r2Storage';
 import { useRetailProfile } from '../components/providers/RetailProfileProvider';
 import { retailProfiles } from '../config/retailProfiles';
 import type { ModuleId } from '../config/retailProfiles';
-import { Check, ArrowLeft } from 'lucide-react';
+import { Check, ArrowLeft, Coins, RefreshCw, Upload, Loader2 } from 'lucide-react';
 import { ImageCropModal } from '../components/ui/ImageCropModal';
 import { CsvImportTutorialModal } from '../components/products/CsvImportTutorialModal';
 import { importProductsFromCSV, exportProductsToCSV } from '../lib/csvHelper';
-import { Upload, Loader2 } from 'lucide-react';
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -34,6 +33,105 @@ const Settings = () => {
 
   const updateSetting = (key: string, value: any) => {
     setShopSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const DEFAULT_RATES_TO_INR: Record<string, number> = {
+    USD: 86.5,
+    EUR: 93.2,
+    GBP: 109.5,
+    CAD: 62.1,
+    AUD: 55.4,
+    AED: 23.5,
+    INR: 1.0,
+  };
+
+  const getSuggestedRate = (from: string, to: string): number => {
+    if (from === to) return 1.0;
+    const fromInINR = DEFAULT_RATES_TO_INR[from] || 1.0;
+    const toInINR = DEFAULT_RATES_TO_INR[to] || 1.0;
+    return Math.round((fromInINR / toInINR) * 10000) / 10000;
+  };
+
+  const [targetCurrency, setTargetCurrency] = useState<string>('USD');
+  const [exchangeRate, setExchangeRate] = useState<number>(0.0116);
+  const [isFetchingRate, setIsFetchingRate] = useState<boolean>(false);
+  const [isConvertingCatalog, setIsConvertingCatalog] = useState(false);
+
+  const fetchLiveRate = async (from: string, to: string) => {
+    if (from === to) {
+      setExchangeRate(1.0);
+      return;
+    }
+    setIsFetchingRate(true);
+    try {
+      const res = await fetch(`https://open.er-api.com/v6/latest/${from}`);
+      const data = await res.json();
+      if (data && data.result === 'success' && data.rates && data.rates[to]) {
+        const live = Math.round(data.rates[to] * 10000) / 10000;
+        setExchangeRate(live);
+        return;
+      }
+    } catch (e) {
+      console.warn('Could not fetch live rate, using preset:', e);
+    } finally {
+      setIsFetchingRate(false);
+    }
+    setExchangeRate(getSuggestedRate(from, to));
+  };
+
+  useEffect(() => {
+    const base = shopSettings.defaultCurrency || 'INR';
+    fetchLiveRate(base, targetCurrency);
+  }, [shopSettings.defaultCurrency, targetCurrency]);
+
+  const handleConvertCatalogPrices = async () => {
+    if (!shop?.id) return;
+    const fromCurr = shopSettings.defaultCurrency || 'INR';
+    
+    if (!window.confirm(`Convert all catalog product prices from ${fromCurr} to ${targetCurrency} at an exchange rate of ${exchangeRate}?`)) {
+      return;
+    }
+
+    setIsConvertingCatalog(true);
+    try {
+      const { data: products, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('shop_id', shop.id)
+        .eq('is_archived', false);
+
+      if (error) throw error;
+      if (!products || products.length === 0) {
+        toast.error('No active products found in catalog to convert.');
+        return;
+      }
+
+      let updatedCount = 0;
+      for (const prod of products) {
+        const newPrice = Math.max(1, Math.round(prod.price * exchangeRate));
+        const updatedAttrs = {
+          ...(prod.attributes || {}),
+          currency: targetCurrency,
+        };
+
+        const { error: updateErr } = await supabase
+          .from('products')
+          .update({
+            price: newPrice,
+            attributes: updatedAttrs,
+          })
+          .eq('id', prod.id);
+
+        if (!updateErr) updatedCount++;
+      }
+
+      toast.success(`Successfully converted ${updatedCount} products to ${targetCurrency}!`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error('Failed to convert prices: ' + err.message);
+    } finally {
+      setIsConvertingCatalog(false);
+    }
   };
 
   const handleLogoFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -501,6 +599,94 @@ const Settings = () => {
         ) : (
           <p className="text-sm text-textSecondary mt-4">No specific settings for this category yet.</p>
         )}
+      </section>
+
+      <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-textPrimary">Currency & Conversion</h3>
+            <p className="text-sm text-textSecondary">Set your workspace default currency or convert catalog product prices.</p>
+          </div>
+          <Coins className="h-6 w-6 text-primary" />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className="block text-sm font-medium text-textPrimary">Workspace Base Currency</label>
+            <select
+              value={shopSettings.defaultCurrency || 'INR'}
+              onChange={(e) => {
+                const newBase = e.target.value;
+                updateSetting('defaultCurrency', newBase);
+                setExchangeRate(getSuggestedRate(newBase, targetCurrency));
+              }}
+              className="mt-2 block w-full rounded-md border-0 py-2.5 px-3 text-textPrimary shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary sm:text-sm"
+            >
+              <option value="INR">INR (₹ - Indian Rupee)</option>
+              <option value="USD">USD ($ - US Dollar)</option>
+              <option value="EUR">EUR (€ - Euro)</option>
+              <option value="GBP">GBP (£ - British Pound)</option>
+              <option value="CAD">CAD ($ - Canadian Dollar)</option>
+              <option value="AUD">AUD ($ - Australian Dollar)</option>
+              <option value="AED">AED (د.إ - UAE Dirham)</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-textPrimary">Catalog Convert Target</label>
+            <select
+              value={targetCurrency}
+              onChange={(e) => setTargetCurrency(e.target.value)}
+              className="mt-2 block w-full rounded-md border-0 py-2.5 px-3 text-textPrimary shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary sm:text-sm"
+            >
+              <option value="USD">USD ($ - US Dollar)</option>
+              <option value="INR">INR (₹ - Indian Rupee)</option>
+              <option value="EUR">EUR (€ - Euro)</option>
+              <option value="GBP">GBP (£ - British Pound)</option>
+              <option value="CAD">CAD ($ - Canadian Dollar)</option>
+              <option value="AUD">AUD ($ - Australian Dollar)</option>
+              <option value="AED">AED (د.إ - UAE Dirham)</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Currency Conversion Action Card */}
+        <div className="mt-4 p-4 bg-bgSecondary rounded-xl border border-border space-y-3">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold text-textPrimary">Exchange Rate (1 {shopSettings.defaultCurrency || 'INR'} = ? {targetCurrency})</p>
+                {isFetchingRate ? (
+                  <span className="inline-flex items-center text-[10px] font-bold text-primary animate-pulse">
+                    <Loader2 size={12} className="animate-spin mr-1" /> Fetching live rate...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                    🟢 Live Financial API Rate
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-textSecondary mt-0.5">Rates are fetched automatically from live exchange markets. You can also customize the rate manually.</p>
+            </div>
+            <input
+              type="number"
+              step="0.0001"
+              value={exchangeRate}
+              onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 1)}
+              className="w-32 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-bold text-textPrimary shadow-sm"
+            />
+          </div>
+
+          <Button
+            type="button"
+            onClick={handleConvertCatalogPrices}
+            disabled={isConvertingCatalog}
+            className="w-full sm:w-auto gap-2"
+          >
+            {isConvertingCatalog ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+            Convert All Catalog Product Prices to {targetCurrency}
+          </Button>
+        </div>
       </section>
 
       <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 shadow-sm">

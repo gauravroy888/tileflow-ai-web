@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Info, Minus, PackagePlus, Plus, Search, Send, Trash2, X, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Info, Minus, PackagePlus, Plus, Search, Send, Trash2, X, Loader2, UploadCloud, Image as ImageIcon, QrCode } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +38,47 @@ const QuoteBuilder = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [taxRate, setTaxRate] = useState<number>(18);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null);
+  const [isUploadingQr, setIsUploadingQr] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+
+  useEffect(() => {
+    if (shop?.settings?.qrCodeUrl && !qrCodeUrl) {
+      setQrCodeUrl(shop.settings.qrCodeUrl);
+    }
+  }, [shop?.settings?.qrCodeUrl, qrCodeUrl]);
+
+  const handleQrUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingQr(true);
+    try {
+      const url = await uploadToR2(file, 'qrcodes');
+      setQrCodeUrl(url);
+      toast.success('QR Code uploaded successfully');
+    } catch (err) {
+      toast.error('Failed to upload QR Code');
+    } finally {
+      setIsUploadingQr(false);
+    }
+  };
+
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingAttachment(true);
+    try {
+      const url = await uploadToR2(file, 'attachments');
+      setAttachmentUrl(url);
+      toast.success('Attachment uploaded successfully');
+    } catch (err) {
+      toast.error('Failed to upload attachment');
+    } finally {
+      setIsUploadingAttachment(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -75,8 +116,19 @@ const QuoteBuilder = () => {
       ...item,
       areaPerPiece: item.attributes?.areaPerPiece || 1
     }));
-    return calculator(calcItems as any, config);
-  }, [items, waste, calculatorKey]);
+    const baseSummary = calculator(calcItems as any, config);
+    
+    // Recalculate tax based on custom taxRate
+    const tax = Math.round((baseSummary.subtotal * taxRate) / 100);
+    const total = baseSummary.subtotal + tax;
+
+    return {
+      ...baseSummary,
+      taxRate,
+      tax,
+      total
+    };
+  }, [items, waste, calculatorKey, taxRate]);
 
   const updateQuantity = (id: string, difference: number) => setItems((current) => current.map((item) => item.id === id ? { ...item, quantity: Math.max(1, item.quantity + difference) } : item));
   const removeItem = (id: string) => setItems((current) => current.filter((item) => item.id !== id));
@@ -119,13 +171,16 @@ const QuoteBuilder = () => {
       if (itemsError) throw itemsError;
 
       // 1. Generate PDF Blob
-      const pdfBlob = await generateQuotePDF(
-        shop?.name || 'RetailFlow Shop',
+      const pdfBlob = await generateQuotePDF({
+        shopName: shop?.name || 'RetailFlow Shop',
+        logoUrl: shop?.settings?.logoUrl || null,
+        qrCodeUrl: qrCodeUrl,
+        attachmentUrl: attachmentUrl,
         customer,
         items,
-        summary,
-        quote.id
-      );
+        summary: { ...summary, taxRate },
+        quoteId: quote.id
+      });
 
       // 2. Upload to Cloudflare R2
       const fileName = `${quote.id}-${Date.now()}.pdf`;
@@ -225,9 +280,55 @@ const QuoteBuilder = () => {
           })}
           
           <div className="flex justify-between text-textSecondary border-t border-border pt-3"><span>Subtotal</span><span className="font-bold text-textPrimary">{formatRupee(summary.subtotal)}</span></div>
-          <div className="flex justify-between text-textSecondary"><span>GST (18%)</span><span className="font-bold text-textPrimary">{formatRupee(summary.tax)}</span></div>
+          <div className="flex items-center justify-between text-textSecondary">
+            <div className="flex items-center gap-2">
+              <span>GST</span>
+              <select 
+                value={taxRate} 
+                onChange={(e) => setTaxRate(Number(e.target.value))} 
+                className="rounded-lg border border-border bg-[#FCFBF9] px-2 py-1 text-xs font-medium text-textPrimary focus:border-primary focus:outline-none"
+              >
+                <option value={0}>0%</option>
+                <option value={5}>5%</option>
+                <option value={12}>12%</option>
+                <option value={18}>18%</option>
+                <option value={28}>28%</option>
+              </select>
+            </div>
+            <span className="font-bold text-textPrimary">{formatRupee(summary.tax)}</span>
+          </div>
         </div>
         <div className="mx-3 mb-3 flex items-center justify-between rounded-xl bg-[linear-gradient(105deg,#FBE7CC,#F5D8A9)] px-4 py-3.5"><span className="text-sm font-extrabold text-textPrimary">Total amount</span><span className="text-xl font-extrabold tracking-tight text-textPrimary">{formatRupee(summary.total)}</span></div>
+      </section>
+
+      <section className="mt-5 space-y-3">
+        <label className={`flex w-full cursor-pointer items-center justify-between rounded-xl border border-dashed p-4 transition-colors ${qrCodeUrl ? 'border-primary bg-primary/5' : 'border-border bg-surface hover:bg-sand'}`}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#FCFBF9] text-textSecondary">
+              {isUploadingQr ? <Loader2 className="animate-spin" size={20} /> : <QrCode size={20} />}
+            </div>
+            <div>
+              <p className="font-medium text-sm text-textPrimary">{qrCodeUrl ? 'QR Code Added' : 'Add Payment QR Code'}</p>
+              <p className="text-xs text-textSecondary">Shown on PDF bottom</p>
+            </div>
+          </div>
+          <input type="file" accept="image/*" className="hidden" onChange={handleQrUpload} disabled={isUploadingQr} />
+          {qrCodeUrl ? <Check className="text-primary" size={20} /> : <UploadCloud className="text-textSecondary" size={20} />}
+        </label>
+
+        <label className={`flex w-full cursor-pointer items-center justify-between rounded-xl border border-dashed p-4 transition-colors ${attachmentUrl ? 'border-primary bg-primary/5' : 'border-border bg-surface hover:bg-sand'}`}>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#FCFBF9] text-textSecondary">
+              {isUploadingAttachment ? <Loader2 className="animate-spin" size={20} /> : <ImageIcon size={20} />}
+            </div>
+            <div>
+              <p className="font-medium text-sm text-textPrimary">{attachmentUrl ? 'Attachment Added' : 'Add Product Image'}</p>
+              <p className="text-xs text-textSecondary">Optional PDF reference</p>
+            </div>
+          </div>
+          <input type="file" accept="image/*" className="hidden" onChange={handleAttachmentUpload} disabled={isUploadingAttachment} />
+          {attachmentUrl ? <Check className="text-primary" size={20} /> : <UploadCloud className="text-textSecondary" size={20} />}
+        </label>
       </section>
 
       <div className="sticky bottom-20 z-10 mt-5 bg-background/95 py-3 backdrop-blur">

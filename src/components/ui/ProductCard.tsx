@@ -11,11 +11,7 @@ interface ProductCardProps {
   onDelete?: (id: string) => void;
 }
 
-const formatRupee = (value: number) => new Intl.NumberFormat('en-IN', {
-  style: 'currency',
-  currency: 'INR',
-  maximumFractionDigits: 0,
-}).format(value);
+import { formatCurrency } from '../../utils/formatCurrency';
 
 export function ProductCard({ product, onClick, onEdit, onDelete }: ProductCardProps) {
   const { t } = useTranslation();
@@ -60,7 +56,12 @@ export function ProductCard({ product, onClick, onEdit, onDelete }: ProductCardP
         <h3 className="mt-1 truncate text-sm font-extrabold tracking-tight text-textPrimary">{product.name}</h3>
         <p className="mt-1.5 min-h-8 text-[11px] leading-4 text-textSecondary">{attributes.length ? attributes.join(' · ') : 'Add size, finish or SKU'}</p>
         <div className="mt-3 flex items-end justify-between border-t border-border pt-3">
-          <div><p className="text-[10px] font-bold uppercase tracking-wide text-textSecondary">{t('products.price_sqft')}</p><p className="mt-0.5 text-base font-extrabold tracking-tight text-primary">{formatRupee(product.price)}</p></div>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-textSecondary">{t('products.price_sqft')}</p>
+            <p className="mt-0.5 text-base font-extrabold tracking-tight text-primary">
+              {formatCurrency(product.price, product.attributes?.currency || product.attributes?.Currency || (product as any).currency)}
+            </p>
+          </div>
           <MoreHorizontal size={18} className="text-stone" />
         </div>
       </div>
